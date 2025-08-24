@@ -59,7 +59,7 @@ def initialize_log(logging_level):
     compose logs the date when the log has arrived
     """
     logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
+        format='%(asctime)s %(levelname)-8s %(message)s', # 2025-01-01 12:00:00 
         level=logging_level,
         datefmt='%Y-%m-%d %H:%M:%S',
     )

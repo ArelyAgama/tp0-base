@@ -5,8 +5,8 @@ import logging
 class Server:
     def __init__(self, port, listen_backlog):
         # Initialize server socket
-        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.bind(('', port))
+        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #socket IPv4, TCP
+        self._server_socket.bind(('', port)) 
         self._server_socket.listen(listen_backlog)
 
     def run(self):
@@ -34,8 +34,8 @@ class Server:
         try:
             # TODO: Modify the receive to avoid short-reads
             msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
+            addr = client_sock.getpeername() #get IP and port of the client
+            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}') #IP del cliente y el mensaje de hasta 1024 bytes
             # TODO: Modify the send to avoid short-writes
             client_sock.send("{}\n".format(msg).encode('utf-8'))
         except OSError as e:
@@ -53,6 +53,6 @@ class Server:
 
         # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
-        c, addr = self._server_socket.accept()
+        c, addr = self._server_socket.accept() #socket del cliente, address del cliente: IP, puerto
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
