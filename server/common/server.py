@@ -1,5 +1,6 @@
 import socket
 import logging
+import signal
 
 
 class Server:
@@ -8,6 +9,12 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #socket IPv4, TCP
         self._server_socket.bind(('', port)) 
         self._server_socket.listen(listen_backlog)
+        
+        # Variable to control server loop
+        self._running = True
+        
+        # Configure signal handler for SIGTERM
+        signal.signal(signal.SIGTERM, self._handle_sigterm)
 
     def run(self):
         """
@@ -18,11 +25,15 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        while self._running:
+            try:
+                client_sock = self.__accept_new_connection()
+                self.__handle_client_connection(client_sock)
+            except OSError:
+                # Socket was closed during shutdown
+                break
+        
+        logging.info('action: server_finished | result: success')
 
     def __handle_client_connection(self, client_sock):
         """
@@ -56,3 +67,12 @@ class Server:
         c, addr = self._server_socket.accept() #socket del cliente, address del cliente: IP, puerto
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
+
+    def _handle_sigterm(self, signum, frame):
+        """
+        Handle SIGTERM signal for graceful shutdown
+        """
+        logging.info('action: receive_signal | result: success | signal: SIGTERM')
+        self._running = False
+        # Close server socket to stop accepting new connections
+        self._server_socket.close()

@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
@@ -52,9 +55,16 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+	// autoincremental msgID to identify every message sent
+	msgID := 1
+
+	// Channel to receive SIGTERM signal
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGTERM)
+
+	// Send messages if the message amount threshold has not been surpassed or a SIGTERM has not been received
+loop:
+	for i := 0; i < c.config.LoopAmount; i++ {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 
@@ -66,6 +76,7 @@ func (c *Client) StartClientLoop() {
 			msgID,
 		)
 		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+		msgID++
 		c.conn.Close()
 
 		if err != nil {
@@ -81,9 +92,16 @@ func (c *Client) StartClientLoop() {
 			msg,
 		)
 
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-
+		// Wait for period or signal
+		msgTimeout := time.After(c.config.LoopPeriod)
+		select {
+		case <-signalChan:
+			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+			break loop
+		case <-msgTimeout:
+			// Continue to next iteration
+		}
 	}
+
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
