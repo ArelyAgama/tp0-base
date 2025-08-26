@@ -82,5 +82,5 @@ def main():
     success = generar_docker_compose(archivo_salida, cantidad_clientes)
     sys.exit(0 if success else 1)
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
