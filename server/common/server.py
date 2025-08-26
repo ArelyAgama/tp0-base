@@ -26,13 +26,22 @@ class Server:
         """
 
         while self._running:
+            client_sock = None
             try:
                 client_sock = self.__accept_new_connection()
                 self.__handle_client_connection(client_sock)
             except OSError:
                 # Socket was closed during shutdown
+                if client_sock:
+                    client_sock.close()
                 break
-        
+
+        #Doble check de que este cerrado el socket
+        try:
+            self._server_socket.close()
+        except OSError:
+            pass
+
         logging.info('action: server_finished | result: success')
 
     def __handle_client_connection(self, client_sock):
