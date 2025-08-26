@@ -33,6 +33,7 @@ class Server:
             except OSError:
                 # Socket was closed during shutdown
                 if client_sock:
+                    logging.info('action: close_client_socket | result: success')
                     client_sock.close()
                 break
 
@@ -84,4 +85,5 @@ class Server:
         logging.info('action: receive_signal | result: success | signal: SIGTERM')
         self._running = False
         # Close server socket to stop accepting new connections
+        logging.info('action: close_server_socket | result: success')
         self._server_socket.close()
