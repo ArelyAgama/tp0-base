@@ -1,13 +1,7 @@
-#!/usr/bin/env python3
-
 import sys
 
 def generar_docker_compose(archivo_salida, cantidad_clientes):
-    """
-    Genera un archivo docker-compose.yaml con la cantidad especificada de clientes
-    """
     
-    # Contenido base del docker-compose
     contenido = f"""name: tp0
 services:
   server:
@@ -16,12 +10,13 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
+    volumes:
+      - ./server/config.ini:/config.ini
     networks:
       - testing_net
 """
     
-    # Agregar clientes dinámicamente
+    # Agregar clientes 
     for i in range(1, cantidad_clientes + 1):
         contenido += f"""
   client{i}:
@@ -30,7 +25,8 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID={i}
-      - CLI_LOG_LEVEL=DEBUG
+    volumes:
+      - ./client/config.yaml:/config.yaml
     networks:
       - testing_net
     depends_on:
@@ -54,7 +50,10 @@ networks:
         
         print(f"Archivo {archivo_salida} generado con:")
         print(f"   - 1 servidor")
-        print(f"   - {cantidad_clientes} clientes (client1 a client{cantidad_clientes})")
+        if cantidad_clientes > 0:
+            print(f"   - {cantidad_clientes} clientes (client1 a client{cantidad_clientes})")
+        else:
+            print(f"   - 0 clientes")
         print(f"   - Red: testing_net (172.25.125.0/24)")
         
         return True
@@ -64,6 +63,7 @@ networks:
         return False
 
 def main():
+    # Valido la cant de parametros 
     if len(sys.argv) != 3:
         print("Uso: python3 mi-generador.py <archivo_salida> <cantidad_clientes>")
         sys.exit(1)
@@ -72,19 +72,12 @@ def main():
     try:
         cantidad_clientes = int(sys.argv[2])
     except ValueError:
-        print("Error: La cantidad de clientes debe ser un número")
+        print(" Error: La cantidad de clientes debe ser un numero")
         sys.exit(1)
     
-    if cantidad_clientes <= 0:
-        print("Error: La cantidad de clientes debe ser mayor a 0")
+    if cantidad_clientes < 0:
+        print("Error: La cantidad de clientes no puede ser negativa")
         sys.exit(1)
-    
-    if cantidad_clientes > 100:
-        print("Advertencia: Generar mas de 100 clientes puede ser intensivo")
-        respuesta = input("¿Continuar? (y/N): ")
-        if respuesta.lower() != 'y':
-            print("Operación cancelada")
-            sys.exit(0)
     
     success = generar_docker_compose(archivo_salida, cantidad_clientes)
     sys.exit(0 if success else 1)
