@@ -1,22 +1,26 @@
-#!/bin/bash
-
-# Verificar que se pasaron los parámetros correctos
+# Verificar que se pasaron 2 parametros
 if [ $# -ne 2 ]; then
     echo "Uso: $0 <archivo_salida> <cantidad_clientes>"
     echo "Ejemplo: $0 docker-compose-dev.yaml 5"
     exit 1
 fi
 
-# Obtener parámetros
+# Parametros
 ARCHIVO_SALIDA=$1
 CANTIDAD_CLIENTES=$2
 
 echo "Nombre del archivo de salida: $ARCHIVO_SALIDA"
 echo "Cantidad de clientes: $CANTIDAD_CLIENTES"
 
-# Validar que la cantidad de clientes sea un número positivo
-if ! [[ "$CANTIDAD_CLIENTES" =~ ^[0-9]+$ ]] || [ "$CANTIDAD_CLIENTES" -eq 0 ]; then
-    echo "Error: La cantidad de clientes debe ser un número positivo"
+# Validacion simple, cant de clientes sea un numero
+if ! [[ "$CANTIDAD_CLIENTES" =~ ^[0-9]+$ ]]; then
+    echo "Error: La cantidad de clientes debe ser un número"
+    exit 1
+fi
+
+# Validar que la cantidad de clientes no sea negativa
+if [ "$CANTIDAD_CLIENTES" -lt 0 ]; then
+    echo "Error: La cantidad de clientes no puede ser negativa"
     exit 1
 fi
 
