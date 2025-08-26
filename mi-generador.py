@@ -54,7 +54,7 @@ networks:
         with open(archivo_salida, 'w') as file:
             file.write(contenido)
         
-        print(f"📝 Archivo {archivo_salida} generado con:")
+        print(f"Archivo {archivo_salida} generado con:")
         print(f"   • 1 servidor")
         print(f"   • {cantidad_clientes} clientes (client1 a client{cantidad_clientes})")
         print(f"   • Red: testing_net (172.25.125.0/24)")
@@ -62,7 +62,7 @@ networks:
         return True
         
     except Exception as e:
-        print(f"❌ Error al escribir el archivo: {e}")
+        print(f"Error al escribir el archivo: {e}")
         return False
 
 def main():
@@ -74,19 +74,12 @@ def main():
     try:
         cantidad_clientes = int(sys.argv[2])
     except ValueError:
-        print("❌ Error: La cantidad de clientes debe ser un número")
+        print(" Error: La cantidad de clientes debe ser un número")
         sys.exit(1)
     
     if cantidad_clientes <= 0:
-        print("❌ Error: La cantidad de clientes debe ser mayor a 0")
+        print(" Error: La cantidad de clientes debe ser mayor a 0")
         sys.exit(1)
-    
-    if cantidad_clientes > 100:
-        print("⚠️  Advertencia: Generar más de 100 clientes puede ser intensivo")
-        respuesta = input("¿Continuar? (y/N): ")
-        if respuesta.lower() != 'y':
-            print("Operación cancelada")
-            sys.exit(0)
     
     success = generar_docker_compose(archivo_salida, cantidad_clientes)
     sys.exit(0 if success else 1)

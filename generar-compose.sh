@@ -24,8 +24,8 @@ fi
 python3 mi-generador.py "$ARCHIVO_SALIDA" "$CANTIDAD_CLIENTES"
 
 if [ $? -eq 0 ]; then
-    echo "✅ Archivo $ARCHIVO_SALIDA generado exitosamente con $CANTIDAD_CLIENTES clientes"
+    echo "Archivo $ARCHIVO_SALIDA generado exitosamente con $CANTIDAD_CLIENTES clientes"
 else
-    echo "❌ Error al generar el archivo $ARCHIVO_SALIDA"
+    echo "Error al generar el archivo $ARCHIVO_SALIDA"
     exit 1
 fi
