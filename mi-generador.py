@@ -10,8 +10,6 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-    volumes:
-      - ./server/config.ini:/config.ini
     networks:
       - testing_net
 """
@@ -25,8 +23,6 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID={i}
-    volumes:
-      - ./client/config.yaml:/config.yaml
     networks:
       - testing_net
     depends_on:
