@@ -1,6 +1,6 @@
-# Verificar que se pasaron 2 parametros
+# Verificar que se enviaron 2 parametros
 if [ $# -ne 2 ]; then
-    echo "Uso: $0 <archivo_salida> <cantidad_clientes>"
+    echo "Ingresar: $0 <archivo_salida> <cantidad_clientes>"
     echo "Ejemplo: $0 docker-compose-dev.yaml 5"
     exit 1
 fi
@@ -12,24 +12,5 @@ CANTIDAD_CLIENTES=$2
 echo "Nombre del archivo de salida: $ARCHIVO_SALIDA"
 echo "Cantidad de clientes: $CANTIDAD_CLIENTES"
 
-# Validacion simple, cant de clientes sea un numero
-if ! [[ "$CANTIDAD_CLIENTES" =~ ^[0-9]+$ ]]; then
-    echo "Error: La cantidad de clientes debe ser un número"
-    exit 1
-fi
-
-# Validar que la cantidad de clientes no sea negativa
-if [ "$CANTIDAD_CLIENTES" -lt 0 ]; then
-    echo "Error: La cantidad de clientes no puede ser negativa"
-    exit 1
-fi
-
-# Llamar al script de Python para generar el docker-compose
+# Llamo a mi generador que crea el docker compose
 python3 mi-generador.py "$ARCHIVO_SALIDA" "$CANTIDAD_CLIENTES"
-
-if [ $? -eq 0 ]; then
-    echo "Archivo $ARCHIVO_SALIDA generado exitosamente con $CANTIDAD_CLIENTES clientes"
-else
-    echo "Error al generar el archivo $ARCHIVO_SALIDA"
-    exit 1
-fi

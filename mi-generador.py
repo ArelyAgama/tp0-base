@@ -43,7 +43,7 @@ networks:
         - subnet: 172.25.125.0/24
 """
     
-    # Escribir el archivo
+    # Escribo el archivo de salida
     try:
         with open(archivo_salida, 'w') as file:
             file.write(contenido)
@@ -63,21 +63,8 @@ networks:
         return False
 
 def main():
-    # Valido la cant de parametros 
-    if len(sys.argv) != 3:
-        print("Uso: python3 mi-generador.py <archivo_salida> <cantidad_clientes>")
-        sys.exit(1)
-    
     archivo_salida = sys.argv[1]
-    try:
-        cantidad_clientes = int(sys.argv[2])
-    except ValueError:
-        print(" Error: La cantidad de clientes debe ser un numero")
-        sys.exit(1)
-    
-    if cantidad_clientes < 0:
-        print("Error: La cantidad de clientes no puede ser negativa")
-        sys.exit(1)
+    cantidad_clientes = int(sys.argv[2])
     
     success = generar_docker_compose(archivo_salida, cantidad_clientes)
     sys.exit(0 if success else 1)
