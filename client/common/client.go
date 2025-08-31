@@ -62,46 +62,70 @@ func (c *Client) StartClientLoop() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM)
 
-	// Send messages if the message amount threshold has not been surpassed or a SIGTERM has not been received
-loop:
+	// Envio de mensajes
 	for i := 0; i < c.config.LoopAmount; i++ {
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
+		// Envio de mensaje
+		if !c.sendSingleMessage(msgID, signalChan) {
+			return // en caso de error o SIGTERM
 		}
+		msgID++
 
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
-
-		// Wait for period or signal
-		msgTimeout := time.After(c.config.LoopPeriod)
+		// SIGTERM o timeout
 		select {
 		case <-signalChan:
 			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
-			break loop
-		case <-msgTimeout:
-			// Continue to next iteration
+			return
+		case <-time.After(c.config.LoopPeriod):
+			// Continua
 		}
 	}
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+}
+
+// sendSingleMessage handles one complete message exchange with SIGTERM awareness
+func (c *Client) sendSingleMessage(msgID int, signalChan <-chan os.Signal) bool {
+	// Creo la conexión
+	err := c.createClientSocket()
+	if err != nil {
+		log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return false
+	}
+	defer c.conn.Close() // cierro la conexión al final de la fn
+
+	// Envio de mensaje
+	_, err = fmt.Fprintf(c.conn, "[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
+	if err != nil {
+		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return false
+	}
+
+	// Recibo la respuesta
+	responseChan := make(chan string, 1)
+	errorChan := make(chan error, 1)
+
+	go func() {
+		msg, readErr := bufio.NewReader(c.conn).ReadString('\n')
+		if readErr != nil {
+			errorChan <- readErr
+		} else {
+			responseChan <- msg
+		}
+	}()
+
+	// handles SIGTERM, success, error,timeout
+	select {
+	case <-signalChan:
+		log.Infof("action: SIGTERM_during_read | result: success | client_id: %v", c.config.ID)
+		return false
+	case msg := <-responseChan:
+		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v", c.config.ID, msg)
+		return true
+	case err := <-errorChan:
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return false
+	case <-time.After(10 * time.Second):
+		log.Errorf("action: receive_timeout | result: fail | client_id: %v", c.config.ID)
+		return false
+	}
 }
