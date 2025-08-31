@@ -73,7 +73,7 @@ func (c *Client) StartClientLoop() {
 		// SIGTERM o timeout
 		select {
 		case <-signalChan:
-			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+			log.Infof("action: SIGTERM_received | result: success | client_id: %v | msg: stopping_gracefully", c.config.ID)
 			return
 		case <-time.After(c.config.LoopPeriod):
 			// Continua
@@ -91,7 +91,12 @@ func (c *Client) sendSingleMessage(msgID int, signalChan <-chan os.Signal) bool 
 		log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return false
 	}
-	defer c.conn.Close() // cierro la conexión al final de la fn
+	defer func() {
+		if c.conn != nil {
+			log.Infof("action: closing_connection | result: success | client_id: %v", c.config.ID)
+			c.conn.Close()
+		}
+	}() // cierro la conexión al final de la fn
 
 	// Envio de mensaje
 	_, err = fmt.Fprintf(c.conn, "[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
@@ -116,7 +121,7 @@ func (c *Client) sendSingleMessage(msgID int, signalChan <-chan os.Signal) bool 
 	// handles SIGTERM, success, error,timeout
 	select {
 	case <-signalChan:
-		log.Infof("action: SIGTERM_during_read | result: success | client_id: %v", c.config.ID)
+		log.Infof("action: SIGTERM_received | result: success | client_id: %v | msg: stopping_gracefully", c.config.ID)
 		return false
 	case msg := <-responseChan:
 		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v", c.config.ID, msg)

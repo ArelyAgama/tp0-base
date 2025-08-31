@@ -17,10 +17,10 @@ class Server:
 
     def _handle_sigterm(self, signum, frame):
        
-        logging.info('action: receive_signal | result: success | signal: SIGTERM')
+        logging.info('action: SIGTERM_received | result: success | msg: starting_graceful_shutdown')
         self._running = False
         # Cierro el servidor deja de recibir conexiones
-        logging.info('action: close_server_socket | result: success')
+        logging.info('action: closing_server_socket | result: success | msg: no_more_connections_accepted')
         self._server_socket.close()
 
 
@@ -41,11 +41,11 @@ class Server:
             except OSError:
                 # Socket was closed during shutdown
                 if client_sock:
-                    logging.info('action: close_client_socket | result: success')
+                    logging.info('action: closing_client_socket | result: success | msg: connection_terminated_gracefully')
                     client_sock.close()
                 break
 
-        logging.info('action: server_finished | result: success')
+        logging.info('action: server_shutdown_complete | result: success | msg: all_resources_freed')
 
     def __handle_client_connection(self, client_sock):
         """
