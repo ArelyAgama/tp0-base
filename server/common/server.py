@@ -10,11 +10,19 @@ class Server:
         self._server_socket.bind(('', port)) 
         self._server_socket.listen(listen_backlog)
         
-        # Variable to control server loop
         self._running = True
         
-        # Configure signal handler for SIGTERM
+        # Manejo en caso de SIGTERM
         signal.signal(signal.SIGTERM, self._handle_sigterm)
+
+    def _handle_sigterm(self, signum, frame):
+       
+        logging.info('action: receive_signal | result: success | signal: SIGTERM')
+        self._running = False
+        # Cierro el servidor deja de recibir conexiones
+        logging.info('action: close_server_socket | result: success')
+        self._server_socket.close()
+
 
     def run(self):
         """
@@ -37,12 +45,6 @@ class Server:
                     client_sock.close()
                 break
 
-        #Doble check de que este cerrado el socket
-        try:
-            self._server_socket.close()
-        except OSError:
-            pass
-
         logging.info('action: server_finished | result: success')
 
     def __handle_client_connection(self, client_sock):
@@ -62,7 +64,7 @@ class Server:
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
-            client_sock.close()
+            client_sock.close() # Cierro el socket del cliente
 
     def __accept_new_connection(self):
         """
@@ -78,12 +80,4 @@ class Server:
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
 
-    def _handle_sigterm(self, signum, frame):
-        """
-        Handle SIGTERM signal for graceful shutdown
-        """
-        logging.info('action: receive_signal | result: success | signal: SIGTERM')
-        self._running = False
-        # Close server socket to stop accepting new connections
-        logging.info('action: close_server_socket | result: success')
-        self._server_socket.close()
+    
