@@ -1,6 +1,16 @@
 import socket
 import logging
 import signal
+from common import protocol
+from common.utils import store_bets
+
+
+def store_bet(bet):
+    """
+    Persist a single bet in the STORAGE_FILEPATH file.
+    Required by EJ5 - calls store_bets internally.
+    """
+    store_bets([bet])
 
 
 class Server:
@@ -26,9 +36,8 @@ class Server:
 
     def run(self):
         """
-        Dummy Server loop
 
-        Server that accept a new connections and establishes a
+        Server that accept new connections and establishes a
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
@@ -47,6 +56,8 @@ class Server:
 
         logging.info('action: server_shutdown_complete | result: success | msg: all_resources_freed')
 
+        
+
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -55,16 +66,40 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername() #get IP and port of the client
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}') #IP del cliente y el mensaje de hasta 1024 bytes
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            # Read message using communication protocol (EJ5)
+            bet_msg, err = protocol.read_socket(client_sock)
+            if err is not None:
+                addr = client_sock.getpeername() #get IP and port of the client
+                logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
+                return
+
+            # Deserialize message into Bet object (EJ5)
+            bet, err = protocol.deserialize(bet_msg)
+            if err is not None:
+                addr = client_sock.getpeername()
+                logging.error(f'action: deserialize | result: fail | ip: {addr[0]} | error: {err}')
+                client_sock.close()
+                return
+
+            # Store the bet using the required function (EJ5)
+            store_bet(bet)
+            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+
+            # Send ACK message back to client (EJ5)
+            ack_msg = f'ACK/{bet.agency}/{bet.number}'
+            err = protocol.write_socket(client_sock, ack_msg)
+            if err is not None:
+                addr = client_sock.getpeername()
+                logging.error(f'action: send_ack | result: fail | ip: {addr[0]} | error: {err}')
+                client_sock.close()
+                return
+                
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close() # Cierro el socket del cliente
+
+        
 
     def __accept_new_connection(self):
         """
@@ -79,5 +114,3 @@ class Server:
         c, addr = self._server_socket.accept() #socket del cliente, address del cliente: IP, puerto
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
-
-    

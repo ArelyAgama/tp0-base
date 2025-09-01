@@ -1,32 +1,111 @@
 name: tp0
-services:
-  server:
-    container_name: server
-    image: server:latest
-    entrypoint: python3 /main.py
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./server/config.ini:/config.ini
-    networks:
-      - testing_net
-
-  client1:
-    container_name: client1
-    image: client:latest
-    entrypoint: /client
-    environment:
-      - CLI_ID=1
-    volumes:
-      - ./client/config.yaml:/config.yaml
-    networks:
-      - testing_net
-    depends_on:
-      - server
-
 networks:
   testing_net:
     ipam:
-      driver: default
       config:
-        - subnet: 172.25.125.0/24
+      - subnet: 172.26.126.0/24
+      driver: default
+services:
+  server:
+    container_name: server
+    entrypoint: python3 /main.py
+    environment:
+    - PYTHONUNBUFFERED=1
+    - LOGGING_LEVEL=DEBUG
+    image: server:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./server/config.ini:/config.ini
+  client1:
+    container_name: client1
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=1
+    - CLI_LOG_LEVEL=DEBUG
+    - NOMBRE=Camila Rocio
+    - APELLIDO=Varela
+    - DOCUMENTO=37130775
+    - NACIMIENTO=1995-05-09
+    - NUMERO=4179
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client2:
+    container_name: client2
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=2
+    - CLI_LOG_LEVEL=DEBUG
+    - NOMBRE=Marcos Nahuel
+    - APELLIDO=Rotman
+    - DOCUMENTO=28625624
+    - NACIMIENTO=2002-09-04
+    - NUMERO=8117
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client3:
+    container_name: client3
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=3
+    - CLI_LOG_LEVEL=DEBUG
+    - NOMBRE=Kiara Valentin
+    - APELLIDO=Basile
+    - DOCUMENTO=32250087
+    - NACIMIENTO=1987-05-17
+    - NUMERO=7364
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client4:
+    container_name: client4
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=4
+    - CLI_LOG_LEVEL=DEBUG
+    - NOMBRE=Joaquin Sebastian
+    - APELLIDO=Rivera
+    - DOCUMENTO=21104770
+    - NACIMIENTO=1980-12-11
+    - NUMERO=7737
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client5:
+    container_name: client5
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=5
+    - CLI_LOG_LEVEL=DEBUG
+    - NOMBRE=Milagros Jazmin
+    - APELLIDO=Sosa
+    - DOCUMENTO=37840762
+    - NACIMIENTO=1991-12-20
+    - NUMERO=6219
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  
+version: '3.9'
