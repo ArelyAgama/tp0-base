@@ -8,31 +8,30 @@ networks:
 services:
   server:
     container_name: server
+    image: server:latest
     entrypoint: python3 /main.py
     environment:
     - PYTHONUNBUFFERED=1
-    - LOGGING_LEVEL=DEBUG
-    image: server:latest
+    
     networks:
     - testing_net
     volumes:
     - ./server/config.ini:/config.ini
   client1:
     container_name: client1
-    depends_on:
-    - server
+    image: client:latest
     entrypoint: /client
     environment:
     - CLI_ID=1
-    - CLI_LOG_LEVEL=DEBUG
     - NOMBRE=Camila Rocio
     - APELLIDO=Varela
     - DOCUMENTO=37130775
     - NACIMIENTO=1995-05-09
     - NUMERO=4179
-    image: client:latest
     networks:
     - testing_net
+    depends_on:
+    - server
     volumes:
     - ./client/config.yaml:/config.yaml
   client2:
@@ -42,7 +41,6 @@ services:
     entrypoint: /client
     environment:
     - CLI_ID=2
-    - CLI_LOG_LEVEL=DEBUG
     - NOMBRE=Marcos Nahuel
     - APELLIDO=Rotman
     - DOCUMENTO=28625624
@@ -60,7 +58,6 @@ services:
     entrypoint: /client
     environment:
     - CLI_ID=3
-    - CLI_LOG_LEVEL=DEBUG
     - NOMBRE=Kiara Valentin
     - APELLIDO=Basile
     - DOCUMENTO=32250087
@@ -78,7 +75,6 @@ services:
     entrypoint: /client
     environment:
     - CLI_ID=4
-    - CLI_LOG_LEVEL=DEBUG
     - NOMBRE=Joaquin Sebastian
     - APELLIDO=Rivera
     - DOCUMENTO=21104770
@@ -96,7 +92,6 @@ services:
     entrypoint: /client
     environment:
     - CLI_ID=5
-    - CLI_LOG_LEVEL=DEBUG
     - NOMBRE=Milagros Jazmin
     - APELLIDO=Sosa
     - DOCUMENTO=37840762
