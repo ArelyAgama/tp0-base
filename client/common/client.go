@@ -22,7 +22,6 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
-// Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
@@ -55,77 +54,50 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// autoincremental msgID to identify every message sent
-	msgID := 1
-
-	// Channel to receive SIGTERM signal
+	// Channel simple para recibir SIGTERM
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM)
 
-	// Envio de mensajes
-	for i := 0; i < c.config.LoopAmount; i++ {
-		// Envio de mensaje
-		if !c.sendSingleMessage(msgID, signalChan) {
-			return // en caso de error o SIGTERM
-		}
-		msgID++
-
-		// SIGTERM o timeout
+	// Loop principal con mensajes
+	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+		// Verificar SIGTERM antes de cada mensaje
 		select {
-		case <-signalChan:
-			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
-			return
-		case <-time.After(c.config.LoopPeriod):
-			// Continua
+			case <-signalChan:
+				log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+				return
+			default:
+				// Continúa normal
 		}
+
+		// Crear conexión para este mensaje
+		err := c.createClientSocket()
+		if err != nil {
+			log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			return
+		}
+
+		// Enviar mensaje
+		_, err = fmt.Fprintf(c.conn, "[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
+		if err != nil {
+			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			c.conn.Close()
+			return
+		}
+
+		// Recibir respuesta (blocking, simple)
+		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+		c.conn.Close()
+
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			return
+		}
+
+		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v", c.config.ID, msg)
+
+		// Esperar antes del siguiente mensaje
+		time.Sleep(c.config.LoopPeriod)
 	}
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-}
-
-// sendSingleMessage handles one complete message exchange with SIGTERM awareness
-func (c *Client) sendSingleMessage(msgID int, signalChan <-chan os.Signal) bool {
-	// Creo la conexión
-	err := c.createClientSocket()
-	if err != nil {
-		log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return false
-	}
-	defer c.conn.Close() // cierro la conexión al final de la fn
-
-	// Envio de mensaje
-	_, err = fmt.Fprintf(c.conn, "[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
-	if err != nil {
-		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return false
-	}
-
-	// Recibo la respuesta
-	responseChan := make(chan string, 1)
-	errorChan := make(chan error, 1)
-
-	go func() {
-		msg, readErr := bufio.NewReader(c.conn).ReadString('\n')
-		if readErr != nil {
-			errorChan <- readErr
-		} else {
-			responseChan <- msg
-		}
-	}()
-
-	// handles SIGTERM, success, error,timeout
-	select {
-	case <-signalChan:
-		log.Infof("action: SIGTERM_during_read | result: success | client_id: %v", c.config.ID)
-		return false
-	case msg := <-responseChan:
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v", c.config.ID, msg)
-		return true
-	case err := <-errorChan:
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return false
-	case <-time.After(10 * time.Second):
-		log.Errorf("action: receive_timeout | result: fail | client_id: %v", c.config.ID)
-		return false
-	}
 }
