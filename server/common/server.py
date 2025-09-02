@@ -78,8 +78,8 @@ class Server:
             store_bet(bet)
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
-            # Envio de ACK al cliente
-            ack_msg = f'ACK/{bet.agency}/{bet.number}'
+            # Envio de ACK al cliente indicando DNI y numero  
+            ack_msg = f'ACK/{bet.document}/{bet.number}'
             err = protocol.write_socket(client_sock, ack_msg)
             if err is not None:
                 addr = client_sock.getpeername()
