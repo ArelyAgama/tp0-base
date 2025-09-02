@@ -11,7 +11,7 @@ DOCUMENT= 3
 BIRTH= 4
 NUMBER= 5
 
-# Deserializa un mensaje de batch y retorna lista de apuestas
+# Deserializa un mensaje de batch y retorna lista de apuestas y si es el último batch
 def deserialize_batch(msg):
     lines = msg.strip().split('\n')
     if len(lines) < 1:

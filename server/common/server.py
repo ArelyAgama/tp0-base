@@ -44,7 +44,6 @@ class Server:
                 logging.debug(f"action: client_connected | result: success | next_action: handle_client")
                 self.__handle_client_connection(client_sock)
             except OSError as e:
-                # Socket was closed during shutdown
                 logging.error(f"action: client_handler | result: fail | error: {e}")
                 if client_sock:
                     logging.info('action: close_client_socket | result: success')
@@ -56,12 +55,10 @@ class Server:
                     client_sock.close()
 
         logging.info('action: server_finished | result: success')
-        
 
+    # Maneja la conexión de un cliente procesando múltiples batches de apuestas
     def __handle_client_connection(self, client_sock):
-        """
-        Maneja la conexión de un cliente procesando múltiples batches de apuestas (EJ6).
-        """
+        
         addr = None
         try:
             addr = client_sock.getpeername()
@@ -70,14 +67,13 @@ class Server:
             
             # Loop para procesar múltiples batches del mismo cliente
             while True:
-                # Leo el mensaje enviado por el cliente usando nuestro protocolo mejorado
                 bet_msg, err = protocol.read_socket(client_sock)
                 if err is not None:
                     logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
                     break
 
                 batch_count += 1
-                # Procesar el batch
+
                 is_last = self.__handle_batch_processing(client_sock, bet_msg)
                 
                 # Si es el último batch, terminar el loop
@@ -91,8 +87,8 @@ class Server:
                 logging.info(f"action: close_client_connection | result: success | ip: {addr[0]}")
             client_sock.close()
 
+    # Deserializa, almacena y valida si es el último batch
     def __handle_batch_processing(self, client_sock, bet_msg):
-        """Procesa un batch de apuestas. Retorna True si es el último batch """
         try:
             addr = client_sock.getpeername()
             
@@ -134,7 +130,6 @@ class Server:
             # Error en deserialización o procesamiento general del batch
             try:
                 addr = client_sock.getpeername()
-                # Si no podemos determinar cuántas apuestas había, usamos 0
                 logging.error(f"action: apuesta_recibida | result: fail | cantidad: 0")
                 response = "ERROR_400"  # Código de error de formato inválido
                 protocol.write_socket(client_sock, response)
