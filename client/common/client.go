@@ -173,17 +173,47 @@ func (c *Client) StartClientLoop() {
 		}
 	}()
 
-	// Abrir archivo CSV desde variable de entorno o construir path por defecto
+	// Determinar archivo CSV desde variable de entorno o construir path por defecto
 	filename := os.Getenv("CLI_CSV_FILE")
 	if filename == "" {
 		filename = fmt.Sprintf("/dataset/agency-%s.csv", c.config.ID)
 	}
 
+	// Loop principal que se ejecuta loop.amount veces
+	for loopIteration := 1; loopIteration <= c.config.LoopAmount; loopIteration++ {
+		// Verificar SIGTERM antes de cada iteración
+		select {
+		case <-signalChan:
+			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+			return
+		default:
+			// Continúa normal
+		}
+
+		err := c.processCSVFile(filename, loopIteration)
+		if err != nil {
+			log.Errorf("action: process_csv_file | result: fail | client_id: %v | iteration: %d | error: %v",
+				c.config.ID, loopIteration, err)
+			return
+		}
+
+		// Si no es la última iteración, esperar el período especificado
+		if loopIteration < c.config.LoopAmount {
+			time.Sleep(c.config.LoopPeriod)
+		}
+	}
+
+	log.Infof("action: all_loops_completed | result: success | client_id: %v | total_iterations: %d",
+		c.config.ID, c.config.LoopAmount)
+}
+
+// processCSVFile procesa un archivo CSV completo por batches
+func (c *Client) processCSVFile(filename string, iteration int) error {
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Errorf("action: open_file | result: fail | client_id: %v | file: %s | error: %v",
-			c.config.ID, filename, err)
-		return
+		log.Errorf("action: open_file | result: fail | client_id: %v | file: %s | iteration: %d | error: %v",
+			c.config.ID, filename, iteration, err)
+		return err
 	}
 	defer file.Close()
 
@@ -199,7 +229,7 @@ func (c *Client) StartClientLoop() {
 		if err != nil {
 			log.Errorf("action: read_batch | result: fail | client_id: %v | error: %v",
 				c.config.ID, err)
-			return
+			return err
 		}
 
 		if len(batch) == 0 {
@@ -224,7 +254,7 @@ func (c *Client) StartClientLoop() {
 		if err != nil {
 			log.Errorf("action: send_batch | result: fail | client_id: %v | batch: %d | error: %v",
 				c.config.ID, batchCount, err)
-			return
+			return err
 		}
 		log.Infof("action: send_batch | result: success | client_id: %v | batch: %d", c.config.ID, batchCount)
 
@@ -233,7 +263,7 @@ func (c *Client) StartClientLoop() {
 		if err != nil {
 			log.Errorf("action: receive_ack | result: fail | client_id: %v | batch: %d | error: %v",
 				c.config.ID, batchCount, err)
-			return
+			return err
 		}
 		log.Infof("action: receive_ack | result: success | client_id: %v | batch: %d | ack: %s", c.config.ID, batchCount, ackMsg)
 
@@ -247,4 +277,6 @@ func (c *Client) StartClientLoop() {
 
 	log.Infof("action: all_batches_sent | result: success | client_id: %v | total_batches: %d | total_bets: %d",
 		c.config.ID, batchCount, totalBets)
+	
+	return nil
 }
