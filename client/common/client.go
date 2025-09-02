@@ -61,7 +61,7 @@ func (c *Client) ReadBetBatch(reader *csv.Reader) ([]Bet, bool, error) {
 
 		// Si se alcanza el final del archivo, se sale del bucle
 		if err == io.EOF {
-			log.Infof("action: read_csv | result: eof_reached | client_id: %v | batch_current_size: %d", c.config.ID, len(batch))
+			log.Infof("action: read_csv | result: success | client_id: %v | batch_current_size: %d", c.config.ID, len(batch))
 			isEOF = true
 			break
 		}

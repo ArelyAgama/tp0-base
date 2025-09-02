@@ -41,7 +41,7 @@ class Server:
             client_sock = None
             try:
                 client_sock = self.__accept_new_connection()
-                logging.debug(f"action: client_connected | result: success | about_to_call_handler")
+                logging.debug(f"action: client_connected | result: success | next_action: handle_client")
                 self.__handle_client_connection(client_sock)
                 logging.debug("action: client_handler | result: completed")
             except OSError as e:
