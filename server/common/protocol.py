@@ -76,25 +76,49 @@ def deserialize(msg):
 def _handle_short_read(socket, total_bytes_to_read):
     bytes_read = 0
     msg = ""
+    logging.debug(f"action: handle_short_read | result: attempting | total_bytes: {total_bytes_to_read}")
+    
     while bytes_read < total_bytes_to_read:
-        data = socket.recv(total_bytes_to_read - bytes_read)
-        if not data:
-            break
-        decoded_data = data.decode('utf-8')
-        msg += decoded_data
-        bytes_read += len(decoded_data)
+        try:
+            data = socket.recv(total_bytes_to_read - bytes_read)
+            if not data:
+                logging.debug(f"action: handle_short_read | result: no_data | bytes_read: {bytes_read}")
+                break
+            
+            logging.debug(f"action: handle_short_read | result: data_received | bytes_received: {len(data)} | total_read: {bytes_read}")
+            # Usar encoding con error handling para manejar caracteres especiales
+            decoded_data = data.decode('utf-8', errors='ignore')
+            msg += decoded_data
+            bytes_read += len(data)  # Contar bytes originales, no caracteres decodificados
+            
+        except UnicodeDecodeError as e:
+            logging.error(f"action: handle_short_read | result: decode_error | error: {e} | bytes_read: {bytes_read}")
+            # Intentar con latin-1 que acepta cualquier byte
+            decoded_data = data.decode('latin-1')
+            msg += decoded_data
+            bytes_read += len(data)
+            
+    logging.debug(f"action: handle_short_read | result: complete | total_read: {bytes_read} | expected: {total_bytes_to_read}")
     return msg
 
 # Leo del socket validando con handle short-read
 def read_socket(socket):
     try: 
+        logging.debug("action: read_socket | result: attempting | step: reading_header")
         header = _handle_short_read(socket, HEADER_LENGTH)
+        logging.debug(f"action: read_socket | result: header_read | header: {header}")
+        
         msg_len = int(header)
+        logging.debug(f"action: read_socket | result: parsing_length | msg_len: {msg_len}")
 
+        logging.debug(f"action: read_socket | result: attempting | step: reading_message | msg_len: {msg_len}")
         bet_msg = _handle_short_read(socket, msg_len)
+        logging.debug(f"action: read_socket | result: message_read | msg_len: {len(bet_msg)}")
+        
         return bet_msg, None
     
     except Exception as e:
+        logging.error(f"action: read_socket | result: fail | error: {e}")
         return None, e
 
 # Escribo en el socket validando con handle short-write
@@ -122,7 +146,7 @@ def get_header(msg):
     msg_len = str(len(msg))
     msg_len_bytes = len(msg_len)
 
-    for _ in range(0, HEADER_LENGHT - msg_len_bytes):
+    for _ in range(0, HEADER_LENGTH - msg_len_bytes):
         msg_len = '0' + msg_len
 
     return msg_len

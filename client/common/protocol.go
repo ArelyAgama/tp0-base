@@ -2,10 +2,7 @@ package common
 
 import (
 	"net"
-	"fmt"
 	"strconv"
-	"reflect"
-	"strings"
 )
 
 const (
@@ -82,17 +79,3 @@ func handleShortRead(conn net.Conn, total_bytes_to_read int) (string, error) {
 	return msg, nil
 }
 
-// Serializo los datos de la apuesta EJ: AGENCIA/NOMBRE/APELLIDO/DOCUMENTO/NACIMIENTO/NUMERO
-func (c *Client) serialize() string {
-	msg := c.config.ID + "/"
-	v := reflect.ValueOf(c.bet)
-
-	for i := 0; i < v.NumField(); i++ {
-		val := v.Field(i).Interface()
-		msg += fmt.Sprintf("%s/", val)
-	}
-	//elimino el / sobrante
-	msg = strings.TrimSuffix(msg, "/")
-
-	return msg
-}

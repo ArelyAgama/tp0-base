@@ -40,40 +40,66 @@ class Server:
         while self._running:
             client_sock = None
             try:
+                logging.debug("action: waiting_for_connection | result: attempting")
                 client_sock = self.__accept_new_connection()
+                logging.debug(f"action: client_connected | result: success | about_to_call_handler")
                 self.__handle_client_connection(client_sock)
-            except OSError:
+                logging.debug("action: client_handler | result: completed")
+            except OSError as e:
                 # Socket was closed during shutdown
+                logging.error(f"action: client_handler | result: os_error | error: {e}")
                 if client_sock:
                     logging.info('action: close_client_socket | result: success')
                     client_sock.close()
                 break
+            except Exception as e:
+                logging.error(f"action: client_handler | result: unexpected_error | error: {e}")
+                if client_sock:
+                    client_sock.close()
 
         logging.info('action: server_finished | result: success')
         
 
     def __handle_client_connection(self, client_sock):
         """
-        Maneja la conexión de un cliente procesando batches de apuestas (EJ6).
+        Maneja la conexión de un cliente procesando múltiples batches de apuestas (EJ6).
         """
+        addr = None
         try:
-            # Leo el mensaje enviado por el cliente
-            bet_msg, err = protocol.read_socket(client_sock)
-            if err is not None:
-                addr = client_sock.getpeername()
-                logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
-                return
+            addr = client_sock.getpeername()
+            logging.info(f"action: handle_client_connection | result: starting | ip: {addr[0]}")
+            batch_count = 0
+            
+            # Loop para procesar múltiples batches del mismo cliente
+            while True:
+                logging.debug(f"action: batch_loop | result: attempting | ip: {addr[0]} | batch_count: {batch_count}")
+                
+                # Leo el mensaje enviado por el cliente usando nuestro protocolo mejorado
+                bet_msg, err = protocol.read_socket(client_sock)
+                if err is not None:
+                    logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
+                    break
 
-            # Procesar como batch (EJ6)
-            self.__handle_batch_processing(client_sock, bet_msg)
+                batch_count += 1
+                logging.info(f'action: batch_received | result: processing | ip: {addr[0]} | batch_number: {batch_count}')
 
-        except OSError as e:
-            logging.error(f"action: handle_client_connection | result: fail | error: {e}")
+                # Procesar el batch
+                is_last = self.__handle_batch_processing(client_sock, bet_msg)
+                
+                # Si es el último batch, terminar el loop
+                if is_last:
+                    logging.info(f'action: all_batches_processed | result: success | ip: {addr[0]} | total_batches: {batch_count}')
+                    break
+
+        except Exception as e:
+            logging.error(f"action: handle_client_connection | result: error | ip: {addr[0] if addr else 'unknown'} | error: {e}")
         finally:
+            if addr:
+                logging.info(f"action: close_client_connection | result: success | ip: {addr[0]}")
             client_sock.close()
 
     def __handle_batch_processing(self, client_sock, bet_msg):
-        """Procesa un batch de apuestas """
+        """Procesa un batch de apuestas. Retorna True si es el último batch """
         try:
             addr = client_sock.getpeername()
             
@@ -103,7 +129,7 @@ class Server:
                 err = protocol.write_socket(client_sock, response)
                 if err is not None:
                     logging.error(f'action: send_error | result: fail | ip: {addr[0]} | error: {err}')
-                return
+                return is_last_batch
             
             # Respuesta exitosa del batch
             response = f"BATCH_ACK/{processed_count}"
@@ -116,6 +142,8 @@ class Server:
             if err is not None:
                 logging.error(f'action: send_batch_ack | result: fail | ip: {addr[0]} | error: {err}')
             
+            return is_last_batch
+            
         except Exception as e:
             # Error en deserialización o procesamiento general del batch
             try:
@@ -127,6 +155,7 @@ class Server:
             except:
                 pass
             logging.error(f"action: process_batch | result: fail | error: {e}")
+            return True  # En caso de error, terminar la conexión
 
         
 
