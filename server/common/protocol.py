@@ -81,17 +81,16 @@ def _handle_short_read(socket, total_bytes_to_read):
         try:
             data = socket.recv(total_bytes_to_read - bytes_read)
             if not data:
-                logging.debug(f"action: handle_short_read | result: no_data | bytes_read: {bytes_read}")
+                logging.debug(f"action: handle_short_read | result: fail | bytes_read: {bytes_read}")
                 break
             
-            logging.debug(f"action: handle_short_read | result: data_received | bytes_received: {len(data)} | total_read: {bytes_read}")
             # Usar encoding con error handling para manejar caracteres especiales
             decoded_data = data.decode('utf-8', errors='ignore')
             msg += decoded_data
             bytes_read += len(data)  # Contar bytes originales, no caracteres decodificados
             
         except UnicodeDecodeError as e:
-            logging.error(f"action: handle_short_read | result: decode_error | error: {e} | bytes_read: {bytes_read}")
+            logging.error(f"action: handle_short_read | result: fail | error: {e} | bytes_read: {bytes_read}")
             # Intentar con latin-1 que acepta cualquier byte
             decoded_data = data.decode('latin-1')
             msg += decoded_data
@@ -104,13 +103,11 @@ def _handle_short_read(socket, total_bytes_to_read):
 def read_socket(socket):
     try: 
         header = _handle_short_read(socket, HEADER_LENGTH)
-        logging.debug(f"action: read_socket | result: header_read | header: {header}")
         
         msg_len = int(header)
-        logging.debug(f"action: read_socket | result: parsing_length | msg_len: {msg_len}")
+        logging.debug(f"action: read_socket | result: success | msg_len: {msg_len}")
 
         bet_msg = _handle_short_read(socket, msg_len)
-        logging.debug(f"action: read_socket | result: message_read | msg_len: {len(bet_msg)}")
         
         return bet_msg, None
     

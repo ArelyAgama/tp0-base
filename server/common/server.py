@@ -66,7 +66,7 @@ class Server:
         addr = None
         try:
             addr = client_sock.getpeername()
-            logging.info(f"action: handle_client_connection | result: starting | ip: {addr[0]}")
+            logging.info(f"action: handle_client_connection | result: in_progress | ip: {addr[0]}")
             batch_count = 0
             
             # Loop para procesar múltiples batches del mismo cliente
