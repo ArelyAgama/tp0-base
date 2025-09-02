@@ -62,11 +62,11 @@ func (c *Client) StartClientLoop() {
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
 		// Verificar SIGTERM antes de cada mensaje
 		select {
-			case <-signalChan:
-				log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
-				return
-			default:
-				// Continúa normal
+		case <-signalChan:
+			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+			return
+		default:
+			// Continúa normal
 		}
 
 		// Crear conexión para este mensaje
@@ -76,21 +76,26 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
+		// Asegurar que la conexión se cierre al final de esta iteración
+		defer func(conn net.Conn) {
+			if conn != nil {
+				conn.Close()
+			}
+		}(c.conn)
+
 		// Enviar mensaje
 		_, err = fmt.Fprintf(c.conn, "[CLIENT %v] Message N°%v\n", c.config.ID, msgID)
 		if err != nil {
 			log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			c.conn.Close()
-			return
+			return // defer se ejecuta automáticamente
 		}
 
 		// Recibir respuesta (blocking, simple)
 		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		c.conn.Close()
 
 		if err != nil {
 			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			return
+			return // defer se ejecuta automáticamente
 		}
 
 		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v", c.config.ID, msg)
