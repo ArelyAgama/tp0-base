@@ -40,7 +40,6 @@ class Server:
         while self._running:
             client_sock = None
             try:
-                logging.debug("action: waiting_for_connection | result: attempting")
                 client_sock = self.__accept_new_connection()
                 logging.debug(f"action: client_connected | result: success | about_to_call_handler")
                 self.__handle_client_connection(client_sock)
@@ -72,8 +71,6 @@ class Server:
             
             # Loop para procesar múltiples batches del mismo cliente
             while True:
-                logging.debug(f"action: batch_loop | result: attempting | ip: {addr[0]} | batch_count: {batch_count}")
-                
                 # Leo el mensaje enviado por el cliente usando nuestro protocolo mejorado
                 bet_msg, err = protocol.read_socket(client_sock)
                 if err is not None:

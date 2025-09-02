@@ -76,7 +76,6 @@ def deserialize(msg):
 def _handle_short_read(socket, total_bytes_to_read):
     bytes_read = 0
     msg = ""
-    logging.debug(f"action: handle_short_read | result: attempting | total_bytes: {total_bytes_to_read}")
     
     while bytes_read < total_bytes_to_read:
         try:
@@ -104,14 +103,12 @@ def _handle_short_read(socket, total_bytes_to_read):
 # Leo del socket validando con handle short-read
 def read_socket(socket):
     try: 
-        logging.debug("action: read_socket | result: attempting | step: reading_header")
         header = _handle_short_read(socket, HEADER_LENGTH)
         logging.debug(f"action: read_socket | result: header_read | header: {header}")
         
         msg_len = int(header)
         logging.debug(f"action: read_socket | result: parsing_length | msg_len: {msg_len}")
 
-        logging.debug(f"action: read_socket | result: attempting | step: reading_message | msg_len: {msg_len}")
         bet_msg = _handle_short_read(socket, msg_len)
         logging.debug(f"action: read_socket | result: message_read | msg_len: {len(bet_msg)}")
         

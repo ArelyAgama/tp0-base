@@ -56,8 +56,6 @@ func (c *Client) ReadBetBatch(reader *csv.Reader) ([]Bet, bool, error) {
 	var batch []Bet
 	var isEOF bool
 
-	log.Infof("action: read_batch_start | result: attempting | client_id: %v | batch_size: %d", c.config.ID, c.config.BatchSize)
-
 	for len(batch) < c.config.BatchSize { // Mientras el tamaño del batch sea menor al tamaño configurado
 		record, err := reader.Read()
 
@@ -181,8 +179,6 @@ func (c *Client) StartClientLoop() {
 		filename = fmt.Sprintf("/dataset/agency-%s.csv", c.config.ID)
 	}
 
-	log.Infof("action: opening_csv | result: attempting | client_id: %v | file: %s", c.config.ID, filename)
-
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Errorf("action: open_file | result: fail | client_id: %v | file: %s | error: %v",
@@ -199,8 +195,6 @@ func (c *Client) StartClientLoop() {
 
 	// Procesar archivo por batches
 	for {
-		log.Infof("action: processing_batch | result: attempting | client_id: %v | batch_count: %d", c.config.ID, batchCount)
-		
 		batch, isEOF, err := c.ReadBetBatch(reader)
 		if err != nil {
 			log.Errorf("action: read_batch | result: fail | client_id: %v | error: %v",
@@ -222,12 +216,10 @@ func (c *Client) StartClientLoop() {
 		log.Infof("action: batch_ready | result: success | client_id: %v | batch: %d | size: %d | is_last: %v", c.config.ID, batchCount, len(batch), isLastBatch)
 
 		// Serializar batch
-		log.Infof("action: serialize_batch | result: attempting | client_id: %v | batch: %d", c.config.ID, batchCount)
 		message := c.SerializeBatch(batch, isLastBatch)
 		log.Infof("action: serialize_batch | result: success | client_id: %v | batch: %d | message_length: %d", c.config.ID, batchCount, len(message))
 
 		// Enviar batch
-		log.Infof("action: send_batch | result: attempting | client_id: %v | batch: %d", c.config.ID, batchCount)
 		err = writeSocket(c.conn, message)
 		if err != nil {
 			log.Errorf("action: send_batch | result: fail | client_id: %v | batch: %d | error: %v",
@@ -237,7 +229,6 @@ func (c *Client) StartClientLoop() {
 		log.Infof("action: send_batch | result: success | client_id: %v | batch: %d", c.config.ID, batchCount)
 
 		// Recibir ACK del servidor
-		log.Infof("action: receive_ack | result: attempting | client_id: %v | batch: %d", c.config.ID, batchCount)
 		ackMsg, err := readSocket(c.conn)
 		if err != nil {
 			log.Errorf("action: receive_ack | result: fail | client_id: %v | batch: %d | error: %v",
