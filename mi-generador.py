@@ -25,13 +25,10 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID={i}
-      - NOMBRE=Cliente{i}
-      - APELLIDO=Apellido{i}
-      - DOCUMENTO=1234567{i}
-      - NACIMIENTO=199{i}-01-01
-      - NUMERO=777{i}
+      - CLI_CSV_FILE=/data/agency-{i}.csv
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data:/data:ro
     networks:
       - testing_net
     depends_on:
