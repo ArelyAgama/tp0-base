@@ -110,7 +110,7 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	// Create bet from environment variables (EJ5)
+	// Crea la apuesta
 	bet := common.CreateBet()
 	
 	client := common.NewClient(clientConfig, bet)

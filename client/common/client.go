@@ -12,7 +12,7 @@ import (
 
 var log = logging.MustGetLogger("log")
 
-// Contains the info about the clients bet
+// Info de la apuesta
 type Bet struct {
 	Name		string
 	Surname		string
@@ -29,14 +29,13 @@ type ClientConfig struct {
 	LoopPeriod    time.Duration
 }
 
-// Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
 	bet    Bet
 }
 
-// Creates a Bet from the env variables
+// Creo la apuesta desde las variables de entorno
 func CreateBet() Bet {
 	bet := Bet{
 		Name: os.Getenv("NOMBRE"),
@@ -48,8 +47,7 @@ func CreateBet() Bet {
 	return bet
 }
 
-// NewClient Initializes a new client receiving the configuration
-// as a parameter
+// Agrego la apuesta como parametro del cliente
 func NewClient(config ClientConfig, bet Bet) *Client {
 	client := &Client{
 		config: config,
@@ -74,7 +72,7 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send bet to the server 
+// StartClientLoop envia la apuesta al servidor
 func (c *Client) StartClientLoop() {
 	// Channel to receive SIGTERM signal
 	signalChan := make(chan os.Signal, 1)
@@ -89,7 +87,7 @@ func (c *Client) StartClientLoop() {
 		// Continúa normal
 	}
 
-	// Create the connection to the server
+	// Crear conexion para el cliente
 	err := c.createClientSocket()
 	if err != nil {
 		log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v",
