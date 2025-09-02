@@ -9,25 +9,25 @@ import (
 )
 
 const (
+	HEADER_LENGTH = 4
     READ_BUF_SIZE  = 1024
     WRITE_BUF_SIZE = 1024
-	HEADER_LENGTH = 4
 )
 
-// Called by writeSocket(). It returns the protocols header for a message.
+// 
 func getHeader(msg string) string {
-	msg_len := strconv.Itoa(len(msg))
-	msg_len_bytes := len(msg_len)
+	msg_len := strconv.Itoa(len(msg)) // len("AGENCY/NOMBRE/APELLIDO/DOCUMENTO/NACIMIENTO/NUMERO") => "51"
+	msg_len_bytes := len(msg_len) // len("51") => 2
 	for i := 0; i < HEADER_LENGTH - msg_len_bytes; i++ {
 		msg_len = "0" + msg_len
 	}
-	return msg_len
+	return msg_len // "0051"
 }
 
-// Writes the message into the received socket
+// Escribo el mensaje en el socket con el header correspondiente
 func writeSocket(conn net.Conn, msg string) error {
-	// Add header
-	header := getHeader(msg)
+	// Header
+	header := getHeader(msg) // "0051" bytes
 	complete_msg := header + msg
 
 	err := handleShortWrite(conn, complete_msg, len(complete_msg))
@@ -37,19 +37,16 @@ func writeSocket(conn net.Conn, msg string) error {
 	return nil
 }
 
-// Called by writeSocket(). It makes sure that if a short-write happens,
-// the rest of the message is also sent.
-func handleShortWrite(conn net.Conn, msg string, bytes_to_write int) error {
-	// Send serialized message to server, handling short write
+// Aseguro que se escriba todo el mensaje
+func handleShortWrite(conn net.Conn, msg string, total_bytes_to_write int) error {
 	bytes_wrote := 0
-	for bytes_wrote < bytes_to_write {
+	for bytes_wrote< total_bytes_to_write { // bytes_to_write = 55
 		nbytes, err := conn.Write([]byte(msg[bytes_wrote:]))
 		if err != nil {
 			return err
 		}
-		bytes_wrote += nbytes
+		bytes_wrote += nbytes 
 	}
-
 	return nil
 }
 
@@ -69,13 +66,12 @@ func readSocket(conn net.Conn) (string, error) {
 	return msg, err
 }
 
-// Called by readSocket(). It makes sure that if a short-read happens,
-// the rest of the message is also read.
-func handleShortRead(conn net.Conn, bytes_to_read int) (string, error) {
+// Aseguro que se lea todo el mensaje
+func handleShortRead(conn net.Conn, total_bytes_to_read int) (string, error) {
 	bytes_read := 0
 	msg := ""
-	for bytes_read < bytes_to_read {
-		buf := make([]byte, bytes_to_read - bytes_read)
+	for bytes_read < total_bytes_to_read {
+		buf := make([]byte, total_bytes_to_read - bytes_read)
 		nbytes, err := conn.Read(buf)
 		if err != nil {
 			return "", err
@@ -86,7 +82,7 @@ func handleShortRead(conn net.Conn, bytes_to_read int) (string, error) {
 	return msg, nil
 }
 
-// Serializes the clients bet into a string by iterating over the Bet fields
+// Serializo los datos de la apuesta EJ: AGENCIA/NOMBRE/APELLIDO/DOCUMENTO/NACIMIENTO/NUMERO
 func (c *Client) serialize() string {
 	msg := c.config.ID + "/"
 	v := reflect.ValueOf(c.bet)
@@ -95,7 +91,7 @@ func (c *Client) serialize() string {
 		val := v.Field(i).Interface()
 		msg += fmt.Sprintf("%s/", val)
 	}
-
+	//elimino el / sobrante
 	msg = strings.TrimSuffix(msg, "/")
 
 	return msg

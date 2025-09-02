@@ -101,10 +101,11 @@ func (c *Client) StartClientLoop() {
 			c.conn.Close()
 		}
 	}()
-	
-	// Send Bet to the server
+
+	// Serializo los datos de la apuesta para enviarlo por socket
 	msg := c.serialize()
 	err = writeSocket(c.conn, msg)
+	
 	if err != nil {
 		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
             c.config.ID,
@@ -112,8 +113,8 @@ func (c *Client) StartClientLoop() {
 		)
 		return
 	} 
-
-	// Read Bet ack from server
+	
+	// Leo la respuesta del servidor (ACK simple)
 	bet_msg, err := readSocket(c.conn)
 	if err != nil {
 		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",

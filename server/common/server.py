@@ -1,17 +1,12 @@
 import socket
 import logging
 import signal
-from common import protocol
 from common.utils import store_bets
+from common import protocol
 
-
+# Almacenar 1 apuesta
 def store_bet(bet):
-    """
-    Persist a single bet in the STORAGE_FILEPATH file.
-    Required by EJ5 - calls store_bets internally.
-    """
     store_bets([bet])
-
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -26,17 +21,16 @@ class Server:
         signal.signal(signal.SIGTERM, self._handle_sigterm)
 
     def _handle_sigterm(self, signum, frame):
-       
-        logging.info('action: SIGTERM_received | result: success | msg: starting_graceful_shutdown')
+
+        logging.info('action: receive_signal | result: success | signal: SIGTERM')
         self._running = False
         # Cierro el servidor deja de recibir conexiones
-        logging.info('action: closing_server_socket | result: success | msg: no_more_connections_accepted')
+        logging.info('action: close_server_socket | result: success')
         self._server_socket.close()
 
 
     def run(self):
         """
-
         Server that accept new connections and establishes a
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
@@ -50,12 +44,11 @@ class Server:
             except OSError:
                 # Socket was closed during shutdown
                 if client_sock:
-                    logging.info('action: closing_client_socket | result: success | msg: connection_terminated_gracefully')
+                    logging.info('action: close_client_socket | result: success')
                     client_sock.close()
                 break
 
-        logging.info('action: server_shutdown_complete | result: success | msg: all_resources_freed')
-
+        logging.info('action: server_finished | result: success')
         
 
     def __handle_client_connection(self, client_sock):
@@ -66,14 +59,14 @@ class Server:
         client socket will also be closed
         """
         try:
-            # Read message using communication protocol (EJ5)
+            # Leo la apuesta enviada por el cliente handleando short reads
             bet_msg, err = protocol.read_socket(client_sock)
             if err is not None:
                 addr = client_sock.getpeername() #get IP and port of the client
                 logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
                 return
 
-            # Deserialize message into Bet object (EJ5)
+            # Deserializo la apuesta recibida
             bet, err = protocol.deserialize(bet_msg)
             if err is not None:
                 addr = client_sock.getpeername()
@@ -81,11 +74,11 @@ class Server:
                 client_sock.close()
                 return
 
-            # Store the bet using the required function (EJ5)
+            # Almaceno la apuesta
             store_bet(bet)
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
-            # Send ACK message back to client (EJ5)
+            # Envio de ACK al cliente
             ack_msg = f'ACK/{bet.agency}/{bet.number}'
             err = protocol.write_socket(client_sock, ack_msg)
             if err is not None:
