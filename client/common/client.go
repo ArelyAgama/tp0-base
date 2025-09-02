@@ -179,32 +179,15 @@ func (c *Client) StartClientLoop() {
 		filename = fmt.Sprintf("/dataset/agency-%s.csv", c.config.ID)
 	}
 
-	// Loop principal que se ejecuta loop.amount veces
-	for loopIteration := 1; loopIteration <= c.config.LoopAmount; loopIteration++ {
-		// Verificar SIGTERM antes de cada iteración
-		select {
-		case <-signalChan:
-			log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
-			return
-		default:
-			// Continúa normal
-		}
-
-		err := c.processCSVFile(filename, loopIteration)
-		if err != nil {
-			log.Errorf("action: process_csv_file | result: fail | client_id: %v | iteration: %d | error: %v",
-				c.config.ID, loopIteration, err)
-			return
-		}
-
-		// Si no es la última iteración, esperar el período especificado
-		if loopIteration < c.config.LoopAmount {
-			time.Sleep(c.config.LoopPeriod)
-		}
+	// Procesar el archivo una vez
+	err = c.processCSVFile(filename, 1)
+	if err != nil {
+		log.Errorf("action: process_csv_file | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return
 	}
 
-	log.Infof("action: all_loops_completed | result: success | client_id: %v | total_iterations: %d",
-		c.config.ID, c.config.LoopAmount)
+	log.Infof("action: exit | result: success | client_id: %v", c.config.ID)
 }
 
 // processCSVFile procesa un archivo CSV completo por batches
