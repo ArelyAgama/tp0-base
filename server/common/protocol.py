@@ -81,7 +81,6 @@ def _handle_short_read(socket, total_bytes_to_read):
         try:
             data = socket.recv(total_bytes_to_read - bytes_read)
             if not data:
-                logging.debug(f"action: handle_short_read | result: fail | bytes_read: {bytes_read}")
                 break
             
             # Usar encoding con error handling para manejar caracteres especiales
@@ -96,7 +95,6 @@ def _handle_short_read(socket, total_bytes_to_read):
             msg += decoded_data
             bytes_read += len(data)
             
-    logging.debug(f"action: handle_short_read | result: complete | total_read: {bytes_read} | expected: {total_bytes_to_read}")
     return msg
 
 # Leo del socket validando con handle short-read
@@ -105,7 +103,6 @@ def read_socket(socket):
         header = _handle_short_read(socket, HEADER_LENGTH)
         
         msg_len = int(header)
-        logging.debug(f"action: read_socket | result: success | msg_len: {msg_len}")
 
         bet_msg = _handle_short_read(socket, msg_len)
         

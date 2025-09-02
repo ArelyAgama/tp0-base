@@ -43,16 +43,15 @@ class Server:
                 client_sock = self.__accept_new_connection()
                 logging.debug(f"action: client_connected | result: success | next_action: handle_client")
                 self.__handle_client_connection(client_sock)
-                logging.debug("action: client_handler | result: completed")
             except OSError as e:
                 # Socket was closed during shutdown
-                logging.error(f"action: client_handler | result: os_error | error: {e}")
+                logging.error(f"action: client_handler | result: fail | error: {e}")
                 if client_sock:
                     logging.info('action: close_client_socket | result: success')
                     client_sock.close()
                 break
             except Exception as e:
-                logging.error(f"action: client_handler | result: unexpected_error | error: {e}")
+                logging.error(f"action: client_handler | result: fail | error: {e}")
                 if client_sock:
                     client_sock.close()
 
@@ -78,14 +77,11 @@ class Server:
                     break
 
                 batch_count += 1
-                logging.info(f'action: batch_received | result: processing | ip: {addr[0]} | batch_number: {batch_count}')
-
                 # Procesar el batch
                 is_last = self.__handle_batch_processing(client_sock, bet_msg)
                 
                 # Si es el último batch, terminar el loop
                 if is_last:
-                    logging.info(f'action: all_batches_processed | result: success | ip: {addr[0]} | total_batches: {batch_count}')
                     break
 
         except Exception as e:
@@ -103,8 +99,6 @@ class Server:
             # Deserializar el batch
             bets, is_last_batch = deserialize_batch(bet_msg)
             
-            logging.info(f"action: batch_received | result: success | ip: {addr[0]} | count: {len(bets)} | is_last: {is_last_batch}")
-            
             processed_count = 0
             error_occurred = False
             
@@ -113,10 +107,8 @@ class Server:
                 try:
                     store_bet(bet)
                     processed_count += 1
-                    logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
                         
                 except Exception as e:
-                    logging.error(f"action: store_bet | result: fail | bet: {bet} | error: {e}")
                     error_occurred = True
             
             # Si hubo errores, responder con código de error
@@ -124,20 +116,17 @@ class Server:
                 response = "ERROR_500"  # Código de error interno del servidor
                 logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
                 err = protocol.write_socket(client_sock, response)
-                if err is not None:
-                    logging.error(f'action: send_error | result: fail | ip: {addr[0]} | error: {err}')
                 return is_last_batch
+            
+            # Log de éxito según especificación
+            logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
             
             # Respuesta exitosa del batch
             response = f"BATCH_ACK/{processed_count}"
             if is_last_batch:
                 response += "/LAST"
                 
-            logging.info(f"action: batch_processed | result: success | ip: {addr[0]} | processed: {processed_count} | is_last: {is_last_batch}")
-            
             err = protocol.write_socket(client_sock, response)
-            if err is not None:
-                logging.error(f'action: send_batch_ack | result: fail | ip: {addr[0]} | error: {err}')
             
             return is_last_batch
             
