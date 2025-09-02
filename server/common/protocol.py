@@ -1,7 +1,7 @@
 import logging
 from common.utils import Bet
 
-HEADER_LENGHT = 4
+HEADER_LENGTH= 4
 
 # Campos del mensaje de apuesta
 AGENCY= 0
@@ -88,7 +88,7 @@ def _handle_short_read(socket, total_bytes_to_read):
 # Leo del socket validando con handle short-read
 def read_socket(socket):
     try: 
-        header = _handle_short_read(socket, HEADER_LENGHT)
+        header = _handle_short_read(socket, HEADER_LENGTH)
         msg_len = int(header)
 
         bet_msg = _handle_short_read(socket, msg_len)
