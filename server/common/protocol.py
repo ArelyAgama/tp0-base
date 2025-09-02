@@ -11,27 +11,66 @@ DOCUMENT= 3
 BIRTH= 4
 NUMBER= 5
 
-# Deserializa un mensaje y crea una apuesta.
-def deserialize(msg):
+# Deserializa un mensaje de batch y retorna lista de apuestas
+def deserialize_batch(msg):
+    lines = msg.strip().split('\n')
+    if len(lines) < 1:
+        raise ValueError("Empty batch message")
+    
+    # Primera línea: cantidad de apuestas (y posible EOF marker)
+    first_line = lines[0]
+    is_last_batch = False
+    
+    if '|EOF' in first_line:
+        count_str = first_line.split('|')[0]
+        is_last_batch = True
+    else:
+        count_str = first_line
+    
+    try:
+        expected_count = int(count_str)
+    except ValueError:
+        raise ValueError(f"Invalid batch count: {first_line}")
+    
+    # Verificar que tenemos la cantidad correcta de líneas
+    actual_count = len(lines) - 1  # -1 porque la primera línea es el contador
+    if actual_count != expected_count:
+        raise ValueError(f"Expected {expected_count} bets, got {actual_count}")
+    
+    # Deserializar cada apuesta
+    bets = []
+    for i in range(1, len(lines)):
+        line = lines[i].strip()
+        if not line:  # Saltar líneas vacías
+            continue
+            
+        bet = deserialize_single_bet(line)
+        bets.append(bet)
+    
+    return bets, is_last_batch
+
+# Deserializa una sola apuesta (función auxiliar)
+def deserialize_single_bet(msg):
     splitted_msg = msg.split('/')
+    
+    if len(splitted_msg) != 6:
+        raise ValueError(f"Invalid bet format: expected 6 fields, got {len(splitted_msg)}")
 
     agency = splitted_msg[AGENCY]
     name = splitted_msg[NAME]
     surname = splitted_msg[SURNAME]
     document = splitted_msg[DOCUMENT]
-    birth= splitted_msg[BIRTH]
+    birth = splitted_msg[BIRTH]
     number = splitted_msg[NUMBER]
 
     try:
-        return (Bet(agency,
-                    name,
-                    surname,
-                    document,
-                    birth,
-                    number),
-                    None)
-    except ValueError as e:
-        return (None, e)
+        return Bet(agency, name, surname, document, birth, number)
+    except Exception as e:
+        raise ValueError(f"Error creating bet: {e}")
+
+# Deserializa un mensaje y crea una apuesta (función legacy para EJ5)
+def deserialize(msg):
+    return deserialize_single_bet(msg)
 
 # Valida que se lea el mensaje completo
 def _handle_short_read(socket, total_bytes_to_read):

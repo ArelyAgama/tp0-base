@@ -3,6 +3,7 @@ import logging
 import signal
 from common.utils import store_bets
 from common import protocol
+from common.protocol import deserialize_batch
 
 # Almacenar 1 apuesta
 def store_bet(bet):
@@ -53,44 +54,79 @@ class Server:
 
     def __handle_client_connection(self, client_sock):
         """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
+        Maneja la conexión de un cliente procesando batches de apuestas (EJ6).
         """
         try:
-            # Leo la apuesta enviada por el cliente handleando short reads
+            # Leo el mensaje enviado por el cliente
             bet_msg, err = protocol.read_socket(client_sock)
             if err is not None:
-                addr = client_sock.getpeername() #get IP and port of the client
+                addr = client_sock.getpeername()
                 logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
                 return
 
-            # Deserializo la apuesta recibida
-            bet, err = protocol.deserialize(bet_msg)
-            if err is not None:
-                addr = client_sock.getpeername()
-                logging.error(f'action: deserialize | result: fail | ip: {addr[0]} | error: {err}')
-                client_sock.close()
-                return
+            # Procesar como batch (EJ6)
+            self.__handle_batch_processing(client_sock, bet_msg)
 
-            # Almaceno la apuesta
-            store_bet(bet)
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
-
-            # Envio de ACK al cliente indicando DNI y numero  
-            ack_msg = f'ACK/{bet.document}/{bet.number}'
-            err = protocol.write_socket(client_sock, ack_msg)
-            if err is not None:
-                addr = client_sock.getpeername()
-                logging.error(f'action: send_ack | result: fail | ip: {addr[0]} | error: {err}')
-                client_sock.close()
-                return
-                
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: handle_client_connection | result: fail | error: {e}")
         finally:
-            client_sock.close() # Cierro el socket del cliente
+            client_sock.close()
+
+    def __handle_batch_processing(self, client_sock, bet_msg):
+        """Procesa un batch de apuestas """
+        try:
+            addr = client_sock.getpeername()
+            
+            # Deserializar el batch
+            bets, is_last_batch = deserialize_batch(bet_msg)
+            
+            logging.info(f"action: batch_received | result: success | ip: {addr[0]} | count: {len(bets)} | is_last: {is_last_batch}")
+            
+            processed_count = 0
+            error_occurred = False
+            
+            # Procesar cada apuesta del batch
+            for bet in bets:
+                try:
+                    store_bet(bet)
+                    processed_count += 1
+                    logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+                        
+                except Exception as e:
+                    logging.error(f"action: store_bet | result: fail | bet: {bet} | error: {e}")
+                    error_occurred = True
+            
+            # Si hubo errores, responder con código de error
+            if error_occurred:
+                response = "ERROR_500"  # Código de error interno del servidor
+                logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
+                err = protocol.write_socket(client_sock, response)
+                if err is not None:
+                    logging.error(f'action: send_error | result: fail | ip: {addr[0]} | error: {err}')
+                return
+            
+            # Respuesta exitosa del batch
+            response = f"BATCH_ACK/{processed_count}"
+            if is_last_batch:
+                response += "/LAST"
+                
+            logging.info(f"action: batch_processed | result: success | ip: {addr[0]} | processed: {processed_count} | is_last: {is_last_batch}")
+            
+            err = protocol.write_socket(client_sock, response)
+            if err is not None:
+                logging.error(f'action: send_batch_ack | result: fail | ip: {addr[0]} | error: {err}')
+            
+        except Exception as e:
+            # Error en deserialización o procesamiento general del batch
+            try:
+                addr = client_sock.getpeername()
+                # Si no podemos determinar cuántas apuestas había, usamos 0
+                logging.error(f"action: apuesta_recibida | result: fail | cantidad: 0")
+                response = "ERROR_400"  # Código de error de formato inválido
+                protocol.write_socket(client_sock, response)
+            except:
+                pass
+            logging.error(f"action: process_batch | result: fail | error: {e}")
 
         
 

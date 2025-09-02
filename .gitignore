@@ -3,3 +3,8 @@
 
 # Executables
 bin/
+
+# Data files 
+.data/
+*.csv
+dataset.zip
