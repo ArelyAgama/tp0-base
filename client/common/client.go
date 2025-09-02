@@ -80,6 +80,15 @@ func (c *Client) StartClientLoop() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM)
 
+	// Verificar SIGTERM antes de empezar (como en EJ4)
+	select {
+	case <-signalChan:
+		log.Infof("action: SIGTERM_detected | result: success | client_id: %v", c.config.ID)
+		return
+	default:
+		// Continúa normal
+	}
+
 	// Create the connection to the server
 	err := c.createClientSocket()
 	if err != nil {
