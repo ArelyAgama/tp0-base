@@ -10,6 +10,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - AGENCIAS_TOTALES={cantidad_clientes}
     volumes:
       - ./server/config.ini:/config.ini
     networks:
