@@ -16,6 +16,10 @@ class Server:
         self._server_socket.bind(('', port)) 
         self._server_socket.listen(listen_backlog)
         
+        self.agencias_notificadas = set()
+        self.sorteo_realizado = False
+        self.ganadores_por_agencia = {}  # Dict: agencia_id -> [dni1, dni2, ...]
+        
         self._running = True
         
         # Manejo en caso de SIGTERM
@@ -42,7 +46,7 @@ class Server:
             try:
                 client_sock = self.__accept_new_connection()
                 logging.debug(f"action: client_connected | result: success | next_action: handle_client")
-                self.__handle_client_connection(client_sock)
+                self.__handle_client_connection_extended(client_sock)
             except OSError as e:
                 logging.error(f"action: client_handler | result: fail | error: {e}")
                 if client_sock:
@@ -79,6 +83,43 @@ class Server:
                 # Si es el último batch, terminar el loop
                 if is_last:
                     break
+
+        except Exception as e:
+            logging.error(f"action: handle_client_connection | result: error | ip: {addr[0] if addr else 'unknown'} | error: {e}")
+        finally:
+            if addr:
+                logging.info(f"action: close_client_connection | result: success | ip: {addr[0]}")
+            client_sock.close()
+
+    # Maneja la conexión de un cliente para notificaciones y consultas
+    def __handle_client_connection_extended(self, client_sock):
+        
+        addr = None
+        try:
+            addr = client_sock.getpeername()
+            logging.info(f"action: handle_client_connection | result: in_progress | ip: {addr[0]}")
+            batch_count = 0
+            
+            # Loop para procesar múltiples mensajes del mismo cliente
+            while True:
+                msg, err = protocol.read_socket(client_sock)
+                if err is not None:
+                    logging.error(f'action: read_socket | result: fail | ip: {addr[0]} | error: {err}')
+                    break
+
+                # Determinar tipo de mensaje
+                if msg.startswith("FINISHED/"):
+                    self.__handle_finished_notification(client_sock, msg)
+                    break  # Terminar después de la notificación
+                elif msg.startswith("QUERY_WINNERS/"):
+                    self.__handle_winners_query(client_sock, msg)
+                    break  # Terminar después de la consulta
+                else:
+                    # Es un batch de apuestas
+                    batch_count += 1
+                    is_last = self.__handle_batch_processing(client_sock, msg)
+                    if is_last:
+                        break
 
         except Exception as e:
             logging.error(f"action: handle_client_connection | result: error | ip: {addr[0] if addr else 'unknown'} | error: {e}")
@@ -138,7 +179,98 @@ class Server:
             logging.error(f"action: process_batch | result: fail | error: {e}")
             return True  # En caso de error, terminar la conexión
 
-        
+    # Maneja la notificación de finalización de apuestas de una agencia
+    def __handle_finished_notification(self, client_sock, msg):
+        try:
+            addr = client_sock.getpeername()
+            # Parsear mensaje: "FINISHED/agencia"
+            parts = msg.split('/')
+            if len(parts) != 2:
+                logging.error(f"action: parse_finished_notification | result: fail | ip: {addr[0]} | msg: {msg}")
+                protocol.write_socket(client_sock, "ERROR_400")
+                return
+            
+            agencia = parts[1]
+            self.agencias_notificadas.add(agencia)
+            
+            logging.info(f"action: agency_finished | result: success | agency: {agencia} | total_notified: {len(self.agencias_notificadas)}")
+            
+            # Responder confirmación
+            protocol.write_socket(client_sock, "FINISHED_ACK")
+            
+            # Verificar si todas las agencias han notificado
+            if len(self.agencias_notificadas) == 5:
+                self.__perform_lottery()
+                
+        except Exception as e:
+            logging.error(f"action: handle_finished_notification | result: fail | error: {e}")
+            try:
+                protocol.write_socket(client_sock, "ERROR_500")
+            except:
+                pass
+
+    # Maneja la consulta de ganadores de una agencia
+    def __handle_winners_query(self, client_sock, msg):
+        try:
+            addr = client_sock.getpeername()
+            # Parsear mensaje: "QUERY_WINNERS/agencia"
+            parts = msg.split('/')
+            if len(parts) != 2:
+                logging.error(f"action: parse_winners_query | result: fail | ip: {addr[0]} | msg: {msg}")
+                protocol.write_socket(client_sock, "ERROR_400")
+                return
+            
+            agencia = parts[1]
+            
+            # Verificar que el sorteo ya se haya realizado
+            if not self.sorteo_realizado:
+                logging.error(f"action: query_winners | result: fail | agency: {agencia} | error: lottery_not_performed")
+                protocol.write_socket(client_sock, "ERROR_403")  # Forbidden - sorteo no realizado
+                return
+            
+            # Obtener ganadores de la agencia
+            ganadores = self.ganadores_por_agencia.get(agencia, [])
+            cant_ganadores = len(ganadores)
+            
+            # Formatear respuesta: "WINNERS/agencia/cantidad/dni1,dni2,dni3..."
+            if cant_ganadores > 0:
+                dnis = ','.join(ganadores)
+                response = f"WINNERS/{agencia}/{cant_ganadores}/{dnis}"
+            else:
+                response = f"WINNERS/{agencia}/0/"
+            
+            protocol.write_socket(client_sock, response)
+            logging.info(f"action: winners_query | result: success | agency: {agencia} | winners: {cant_ganadores}")
+            
+        except Exception as e:
+            logging.error(f"action: handle_winners_query | result: fail | error: {e}")
+            try:
+                protocol.write_socket(client_sock, "ERROR_500")
+            except:
+                pass
+
+    # Realiza el sorteo cuando todas las agencias han notificado
+    def __perform_lottery(self):
+        try:
+            logging.info("action: sorteo | result: success")
+            self.sorteo_realizado = True
+            
+            # Cargar todas las apuestas y verificar ganadores
+            from common.utils import load_bets, has_won
+            
+            for bet in load_bets():
+                if has_won(bet):
+                    agencia_str = str(bet.agency)
+                    if agencia_str not in self.ganadores_por_agencia:
+                        self.ganadores_por_agencia[agencia_str] = []
+                    self.ganadores_por_agencia[agencia_str].append(bet.document)
+            
+            # Log de resumen
+            total_ganadores = sum(len(ganadores) for ganadores in self.ganadores_por_agencia.values())
+            logging.info(f"action: lottery_completed | result: success | total_winners: {total_ganadores}")
+            
+        except Exception as e:
+            logging.error(f"action: perform_lottery | result: fail | error: {e}")
 
     def __accept_new_connection(self):
         """

@@ -225,7 +225,7 @@ func (c *Client) processCSVFile(filename string, iteration int) error {
 
 		// Determinar si es el último batch (EOF alcanzado o batch parcial)
 		isLastBatch := isEOF || len(batch) < c.config.BatchSize
-		
+
 		log.Infof("action: batch_ready | result: success | client_id: %v | batch: %d | size: %d | is_last: %v", c.config.ID, batchCount, len(batch), isLastBatch)
 
 		// Serializar batch
@@ -260,6 +260,87 @@ func (c *Client) processCSVFile(filename string, iteration int) error {
 
 	log.Infof("action: all_batches_sent | result: success | client_id: %v | total_batches: %d | total_bets: %d",
 		c.config.ID, batchCount, totalBets)
-	
+
+	// Notificar al servidor que terminamos de enviar todas las apuestas
+	err = c.notifyServerFinished()
+	if err != nil {
+		log.Errorf("action: notify_server_finished | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	// Consultar ganadores de la agencia
+	err = c.queryWinners()
+	if err != nil {
+		log.Errorf("action: query_winners | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	return nil
+}
+
+// notifyServerFinished notifica al servidor que terminamos de enviar todas las apuestas
+func (c *Client) notifyServerFinished() error {
+	// Extraer número de agency (client_1 -> 1)
+	agencyNum := strings.TrimPrefix(c.config.ID, "client_")
+	message := fmt.Sprintf("FINISHED/%s", agencyNum)
+
+	log.Infof("action: notify_server_finished | result: in_progress | client_id: %v", c.config.ID)
+
+	err := writeSocket(c.conn, message)
+	if err != nil {
+		log.Errorf("action: send_finished_notification | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	// Recibir confirmación del servidor
+	response, err := readSocket(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_finished_ack | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	log.Infof("action: notify_server_finished | result: success | client_id: %v | response: %s", c.config.ID, response)
+	return nil
+}
+
+// queryWinners consulta los ganadores de la agencia
+func (c *Client) queryWinners() error {
+	// Extraer número de agency (client_1 -> 1)
+	agencyNum := strings.TrimPrefix(c.config.ID, "client_")
+	message := fmt.Sprintf("QUERY_WINNERS/%s", agencyNum)
+
+	log.Infof("action: query_winners | result: in_progress | client_id: %v", c.config.ID)
+
+	err := writeSocket(c.conn, message)
+	if err != nil {
+		log.Errorf("action: send_query_winners | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	// Recibir lista de ganadores
+	response, err := readSocket(c.conn)
+	if err != nil {
+		log.Errorf("action: receive_winners | result: fail | client_id: %v | error: %v",
+			c.config.ID, err)
+		return err
+	}
+
+	// Parsear respuesta para obtener cantidad de ganadores
+	// Formato esperado: "WINNERS/agencia/cantidad/dni1,dni2,dni3..."
+	parts := strings.Split(response, "/")
+	if len(parts) < 3 || parts[0] != "WINNERS" {
+		log.Errorf("action: parse_winners_response | result: fail | client_id: %v | response: %s",
+			c.config.ID, response)
+		return fmt.Errorf("invalid winners response format")
+	}
+
+	cantGanadores := parts[2]
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %s", cantGanadores)
+
 	return nil
 }
