@@ -19,7 +19,10 @@ class Server:
         
         # Leer número de agencias desde variable de entorno
         agencias_totales_env = os.getenv("AGENCIAS_TOTALES")
-        logging.debug(f"AGENCIAS_TOTALES env var: {agencias_totales_env}")
+        logging.info(f"AGENCIAS_TOTALES env var: {agencias_totales_env}")
+        if agencias_totales_env is None:
+            logging.error("AGENCIAS_TOTALES environment variable not set!")
+            raise ValueError("AGENCIAS_TOTALES environment variable not set!")
         self.agencias_totales = int(agencias_totales_env)
         
         self.agencias_notificadas = set()
