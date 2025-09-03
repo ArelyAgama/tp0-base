@@ -237,7 +237,7 @@ class Server:
             
             # Verificar que el sorteo ya se haya realizado
             if not self.sorteo_realizado:
-                logging.info(f"action: query_winners | result: info | agency: {agencia} | status: lottery_not_ready")
+                logging.info(f"lottery_not_ready | agency: {agencia} | waiting_for_lottery")
                 protocol.write_socket(client_sock, "ERROR_403")  # Forbidden - sorteo no realizado
                 return
             
