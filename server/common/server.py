@@ -17,6 +17,7 @@ class Server:
         self._server_socket.listen(listen_backlog)
         
         self.agencias_notificadas = set()
+        self.agencias_esperadas = set()  # Agregar para rastrear agencias que se conectaron
         self.sorteo_realizado = False
         self.ganadores_por_agencia = {}  # Dict: agencia_id -> [dni1, dni2, ...]
         
@@ -147,6 +148,8 @@ class Server:
                 try:
                     store_bet(bet)
                     processed_count += 1
+                    # Rastrear la agencia que se conectó
+                    self.agencias_esperadas.add(str(bet.agency))
                         
                 except Exception as e:
                     error_occurred = True
@@ -201,8 +204,8 @@ class Server:
             # Responder confirmación
             protocol.write_socket(client_sock, "FINISHED_ACK")
             
-            # Verificar si todas las agencias han notificado
-            if len(self.agencias_notificadas) == 5:
+            # Verificar si todas las agencias esperadas han notificado
+            if len(self.agencias_notificadas) == len(self.agencias_esperadas) and len(self.agencias_esperadas) > 0:
                 self.__perform_lottery()
                 
         except Exception as e:
