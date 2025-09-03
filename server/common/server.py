@@ -99,6 +99,7 @@ class Server:
             addr = client_sock.getpeername()
             logging.info(f"action: handle_client_connection | result: in_progress | ip: {addr[0]}")
             batch_count = 0
+            finished_notified = False
             
             # Loop para procesar múltiples mensajes del mismo cliente
             while True:
@@ -110,7 +111,8 @@ class Server:
                 # Determinar tipo de mensaje
                 if msg.startswith("FINISHED/"):
                     self.__handle_finished_notification(client_sock, msg)
-                    break  # Terminar después de la notificación
+                    finished_notified = True
+                    # NO terminar aquí, esperar la consulta de ganadores
                 elif msg.startswith("QUERY_WINNERS/"):
                     self.__handle_winners_query(client_sock, msg)
                     break  # Terminar después de la consulta
@@ -119,7 +121,8 @@ class Server:
                     batch_count += 1
                     is_last = self.__handle_batch_processing(client_sock, msg)
                     if is_last:
-                        break
+                        # Después del último batch, esperar notificación y consulta
+                        continue
 
         except Exception as e:
             logging.error(f"action: handle_client_connection | result: error | ip: {addr[0] if addr else 'unknown'} | error: {e}")
