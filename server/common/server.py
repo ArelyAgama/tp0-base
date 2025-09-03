@@ -122,7 +122,7 @@ class Server:
                 if msg.startswith("FINISHED/"):
                     self.__handle_finished_notification(client_sock, msg)
                     finished_notified = True
-                    # NO terminar aquí, esperar la consulta de ganadores
+                    break  # Terminar conexión después de FINISHED (estrategia VOLVE PRONTO)
                 elif msg.startswith("QUERY_WINNERS/"):
                     self.__handle_winners_query(client_sock, msg)
                     break  # Terminar después de la consulta
@@ -131,7 +131,7 @@ class Server:
                     batch_count += 1
                     is_last = self.__handle_batch_processing(client_sock, msg)
                     if is_last:
-                        # Después del último batch, esperar notificación y consulta
+                        # Después del último batch, esperar notificación
                         continue
 
         except Exception as e:
