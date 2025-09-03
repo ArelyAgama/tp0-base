@@ -307,40 +307,78 @@ func (c *Client) notifyServerFinished() error {
 	return nil
 }
 
-// queryWinners consulta los ganadores de la agencia
+// queryWinners consulta los ganadores de la agencia con estrategia VOLVE PRONTO
 func (c *Client) queryWinners() error {
-	// Extraer número de agency (client_1 -> 1)
+	// Cerrar conexión inicial (estrategia VOLVE PRONTO)
+	c.conn.Close()
+	log.Infof("action: close_initial_connection | result: success | client_id: %v", c.config.ID)
+
 	agencyNum := strings.TrimPrefix(c.config.ID, "client_")
 	message := fmt.Sprintf("QUERY_WINNERS/%s", agencyNum)
 
 	log.Infof("action: query_winners | result: in_progress | client_id: %v", c.config.ID)
 
-	err := writeSocket(c.conn, message)
-	if err != nil {
-		log.Errorf("action: send_query_winners | result: fail | client_id: %v | error: %v",
-			c.config.ID, err)
-		return err
+	maxRetries := 5
+	retryDelay := 500 * time.Millisecond
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Crear nueva conexión para cada intento
+		conn, err := net.Dial("tcp", c.config.ServerAddress)
+		if err != nil {
+			log.Errorf("action: reconnect_for_winners | result: fail | client_id: %v | attempt: %d | error: %v",
+				c.config.ID, attempt, err)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Enviar consulta de ganadores
+		err = writeSocket(conn, message)
+		if err != nil {
+			log.Errorf("action: send_query_winners | result: fail | client_id: %v | attempt: %d | error: %v",
+				c.config.ID, attempt, err)
+			conn.Close()
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Recibir respuesta
+		response, err := readSocket(conn)
+		conn.Close() // Cerrar conexión inmediatamente después de recibir respuesta
+
+		if err != nil {
+			log.Errorf("action: receive_winners | result: fail | client_id: %v | attempt: %d | error: %v",
+				c.config.ID, attempt, err)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Si el sorteo no está listo, reintentar
+		if response == "ERROR_403" {
+			log.Infof("action: lottery_not_ready | result: success | client_id: %v | attempt: %d | status: retrying",
+				c.config.ID, attempt)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Parsear respuesta exitosa
+		parts := strings.Split(response, "/")
+		if len(parts) < 3 || parts[0] != "WINNERS" {
+			log.Errorf("action: parse_winners_response | result: fail | client_id: %v | response: %s",
+				c.config.ID, response)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Mostrar cantidad de ganadores
+		cantGanadores := parts[2]
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %s | attempts: %d",
+			cantGanadores, attempt)
+
+		return nil
 	}
 
-	// Recibir lista de ganadores
-	response, err := readSocket(c.conn)
-	if err != nil {
-		log.Errorf("action: receive_winners | result: fail | client_id: %v | error: %v",
-			c.config.ID, err)
-		return err
-	}
-
-	// Parsear respuesta para obtener cantidad de ganadores
-	// Formato esperado: "WINNERS/agencia/cantidad/dni1,dni2,dni3..."
-	parts := strings.Split(response, "/")
-	if len(parts) < 3 || parts[0] != "WINNERS" {
-		log.Errorf("action: parse_winners_response | result: fail | client_id: %v | response: %s",
-			c.config.ID, response)
-		return fmt.Errorf("invalid winners response format")
-	}
-
-	cantGanadores := parts[2]
-	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %s", cantGanadores)
-
-	return nil
+	// Falló después de todos los reintentos
+	log.Errorf("action: query_winners | result: fail | client_id: %v | error: max_retries_exceeded",
+		c.config.ID)
+	return fmt.Errorf("max retries exceeded")
 }
