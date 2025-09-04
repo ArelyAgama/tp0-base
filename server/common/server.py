@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 import os
+import threading
 from common.utils import store_bets
 from common import protocol
 from common.protocol import deserialize_batch
@@ -28,6 +29,7 @@ class Server:
         self.agencias_notificadas = set()
         self.sorteo_realizado = False
         self.ganadores_por_agencia = {}  # Dict: agencia_id -> [dni1, dni2, ...]
+        self._server_lock = threading.Lock()  # Lock para proteger secciones críticas
         
         logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales}")
         self._running = True
@@ -47,26 +49,27 @@ class Server:
     def run(self):
         """
         Server that accept new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
+        communication with a client. Multiple clients can connect
+        and be processed in parallel using threads.
         """
 
         while self._running:
-            client_sock = None
             try:
                 client_sock = self.__accept_new_connection()
                 logging.debug(f"action: client_connected | result: success | next_action: handle_client")
-                self.__handle_client_connection_extended(client_sock)
+                
+                # Crear thread para manejar cliente (sin tracking - versión simple)
+                client_thread = threading.Thread(
+                    target=self.__handle_client_connection_extended,
+                    args=(client_sock,)
+                )
+                client_thread.start()
+                
             except OSError as e:
                 logging.error(f"action: client_handler | result: fail | error: {e}")
-                if client_sock:
-                    logging.info('action: close_client_socket | result: success')
-                    client_sock.close()
                 break
             except Exception as e:
                 logging.error(f"action: client_handler | result: fail | error: {e}")
-                if client_sock:
-                    client_sock.close()
 
         logging.info('action: server_finished | result: success')
 
@@ -152,14 +155,15 @@ class Server:
             processed_count = 0
             error_occurred = False
             
-            # Procesar cada apuesta del batch
-            for bet in bets:
-                try:
-                    store_bet(bet)
-                    processed_count += 1
-                        
-                except Exception as e:
-                    error_occurred = True
+            # Procesar cada apuesta del batch (sección crítica)
+            with self._server_lock:
+                for bet in bets:
+                    try:
+                        store_bet(bet)
+                        processed_count += 1
+                            
+                    except Exception as e:
+                        error_occurred = True
             
             # Si hubo errores, responder con código de error
             if error_occurred:
@@ -204,16 +208,19 @@ class Server:
                 return
             
             agencia = parts[1]
-            self.agencias_notificadas.add(agencia)
             
-            logging.info(f"action: agency_finished | result: success | agency: {agencia} | total_notified: {len(self.agencias_notificadas)}")
+            # Sección crítica: modificar contador de agencias y verificar sorteo
+            with self._server_lock:
+                self.agencias_notificadas.add(agencia)
+                
+                logging.info(f"action: agency_finished | result: success | agency: {agencia} | total_notified: {len(self.agencias_notificadas)}")
+                
+                # Verificar si todas las agencias esperadas han notificado
+                if len(self.agencias_notificadas) == self.agencias_totales:
+                    self.__perform_lottery()
             
-            # Responder confirmación
+            # Responder confirmación (fuera del lock)
             protocol.write_socket(client_sock, "FINISHED_ACK")
-            
-            # Verificar si todas las agencias esperadas han notificado
-            if len(self.agencias_notificadas) == self.agencias_totales:
-                self.__perform_lottery()
                 
         except Exception as e:
             logging.error(f"action: handle_finished_notification | result: fail | error: {e}")
@@ -235,15 +242,17 @@ class Server:
             
             agencia = parts[1]
             
-            # Verificar que el sorteo ya se haya realizado
-            if not self.sorteo_realizado:
-                logging.info(f"lottery_not_ready | agency: {agencia} | waiting_for_lottery")
-                protocol.write_socket(client_sock, "ERROR_403")  # Forbidden - sorteo no realizado
-                return
-            
-            # Obtener ganadores de la agencia
-            ganadores = self.ganadores_por_agencia.get(agencia, [])
-            cant_ganadores = len(ganadores)
+            # Sección crítica: verificar estado del sorteo y obtener ganadores
+            with self._server_lock:
+                # Verificar que el sorteo ya se haya realizado
+                if not self.sorteo_realizado:
+                    logging.info(f"lottery_not_ready | agency: {agencia} | waiting_for_lottery")
+                    protocol.write_socket(client_sock, "ERROR_403")  # Forbidden - sorteo no realizado
+                    return
+                
+                # Obtener ganadores de la agencia
+                ganadores = self.ganadores_por_agencia.get(agencia, [])
+                cant_ganadores = len(ganadores)
             
             # Formatear respuesta: "WINNERS/agencia/cantidad/dni1,dni2,dni3..."
             if cant_ganadores > 0:
