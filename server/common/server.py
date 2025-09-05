@@ -3,6 +3,7 @@ import logging
 import signal
 import os
 import threading
+import time
 from common.utils import store_bets
 from common import protocol
 from common.protocol import deserialize_batch
@@ -26,12 +27,22 @@ class Server:
             raise ValueError("AGENCIAS_TOTALES environment variable not set!")
         self.agencias_totales = int(agencias_totales_env)
         
+        # Leer máximo de threads desde variable de entorno
+        max_threads_env = os.getenv("MAX_THREADS")
+        logging.info(f"MAX_THREADS env var: {max_threads_env}")
+        if max_threads_env is None:
+            logging.warning("MAX_THREADS environment variable not set! Using default: 10")
+            self.max_threads = 10
+        else:
+            self.max_threads = int(max_threads_env)
+        
         self.agencias_notificadas = set()
         self.sorteo_realizado = False
         self.ganadores_por_agencia = {}  # Dict: agencia_id -> [dni1, dni2, ...]
         self._server_lock = threading.Lock()  # Lock para proteger secciones críticas
+        self.active_threads = 0  # Contador de threads activos
         
-        logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales}")
+        logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales} | max_threads: {self.max_threads}")
         self._running = True
         
         # Manejo en caso de SIGTERM
@@ -55,12 +66,22 @@ class Server:
 
         while self._running:
             try:
+                # Verificar si podemos crear más threads
+                with self._server_lock:
+                    if self.active_threads >= self.max_threads:
+                        logging.warning(f"action: max_threads_reached | result: success | active_threads: {self.active_threads} | max_threads: {self.max_threads}")
+                        # Rechazar la conexión inmediatamente
+                        client_sock = self.__accept_new_connection()
+                        client_sock.close()  # Cerrar conexión rechazada
+                        logging.info(f"action: connection_rejected | result: success | reason: max_threads_reached")
+                        continue
+                    
                 client_sock = self.__accept_new_connection()
-                logging.debug(f"action: client_connected | result: success | next_action: handle_client")
+                logging.debug(f"action: client_connected | result: success | next_action: handle_client | active_threads: {self.active_threads}")
                 
-                # Crear thread para manejar cliente (sin tracking - versión simple)
+                # Crear thread para manejar cliente
                 client_thread = threading.Thread(
-                    target=self.__handle_client_connection_extended,
+                    target=self.__handle_client_connection_with_tracking,
                     args=(client_sock,)
                 )
                 client_thread.start()
@@ -143,6 +164,22 @@ class Server:
             if addr:
                 logging.info(f"action: close_client_connection | result: success | ip: {addr[0]}")
             client_sock.close()
+
+    # Maneja la conexión de un cliente con tracking de threads
+    def __handle_client_connection_with_tracking(self, client_sock):
+        # Incrementar contador de threads activos
+        with self._server_lock:
+            self.active_threads += 1
+            logging.debug(f"action: thread_started | result: success | active_threads: {self.active_threads}")
+        
+        try:
+            # Llamar al método original
+            self.__handle_client_connection_extended(client_sock)
+        finally:
+            # Decrementar contador de threads activos
+            with self._server_lock:
+                self.active_threads -= 1
+                logging.debug(f"action: thread_finished | result: success | active_threads: {self.active_threads}")
 
     # Deserializa, almacena y valida si es el último batch
     def __handle_batch_processing(self, client_sock, bet_msg):
