@@ -35,14 +35,6 @@ class Server:
         else:
             self.max_threads = int(max_threads_env)
         
-        # Leer cantidad de retries desde variable de entorno
-        cant_retries_env = os.getenv("CANT_RETRIES")
-        logging.info(f"CANT_RETRIES env var: {cant_retries_env}")
-        if cant_retries_env is None:
-            logging.warning("CANT_RETRIES environment variable not set! Using default: 5")
-            self.cant_retries = 5
-        else:
-            self.cant_retries = int(cant_retries_env)
         
         self.agencias_notificadas = set()
         self.sorteo_realizado = False
@@ -50,7 +42,7 @@ class Server:
         self._server_lock = threading.Lock()  # Lock para proteger secciones críticas
         self.active_threads = 0  # Contador de threads activos
         
-        logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales} | max_threads: {self.max_threads} | cant_retries: {self.cant_retries}")
+        logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales} | max_threads: {self.max_threads}")
         self._running = True
         
         # Manejo en caso de SIGTERM

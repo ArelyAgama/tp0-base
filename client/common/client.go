@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -318,7 +319,22 @@ func (c *Client) queryWinners() error {
 
 	log.Infof("action: query_winners | result: in_progress | client_id: %v", c.config.ID)
 
-	maxRetries := 5
+	// Leer cantidad de retries desde variable de entorno
+	cantRetriesEnv := os.Getenv("CANT_RETRIES")
+	var maxRetries int
+	if cantRetriesEnv == "" {
+		log.Warning("CANT_RETRIES environment variable not set! Using default: 5")
+		maxRetries = 5
+	} else {
+		var err error
+		maxRetries, err = strconv.Atoi(cantRetriesEnv)
+		if err != nil {
+			log.Errorf("Invalid CANT_RETRIES value: %s. Using default: 5", cantRetriesEnv)
+			maxRetries = 5
+		}
+	}
+	
+	log.Infof("action: config_retries | result: success | client_id: %v | max_retries: %d", c.config.ID, maxRetries)
 	retryDelay := 500 * time.Millisecond
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
