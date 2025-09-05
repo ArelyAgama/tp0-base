@@ -6,9 +6,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - AGENCIAS_TOTALES=5
-      - MAX_THREADS=10
-      - CANT_RETRIES=5
+      - AGENCIAS_TOTALES=3
     volumes:
       - ./server/config.ini:/config.ini
     networks:
@@ -21,7 +19,6 @@ services:
     environment:
       - CLI_ID=1
       - CLI_CSV_FILE=/data/agency-1.csv
-      - CANT_RETRIES=5
     volumes:
       - ./client/config.yaml:/config.yaml
       - ./.data:/data:ro
@@ -37,7 +34,6 @@ services:
     environment:
       - CLI_ID=2
       - CLI_CSV_FILE=/data/agency-2.csv
-      - CANT_RETRIES=5
     volumes:
       - ./client/config.yaml:/config.yaml
       - ./.data:/data:ro
@@ -53,39 +49,6 @@ services:
     environment:
       - CLI_ID=3
       - CLI_CSV_FILE=/data/agency-3.csv
-      - CANT_RETRIES=5
-    volumes:
-      - ./client/config.yaml:/config.yaml
-      - ./.data:/data:ro
-    networks:
-      - testing_net
-    depends_on:
-      - server
-
-  client4:
-    container_name: client4
-    image: client:latest
-    entrypoint: /client
-    environment:
-      - CLI_ID=4
-      - CLI_CSV_FILE=/data/agency-4.csv
-      - CANT_RETRIES=5
-    volumes:
-      - ./client/config.yaml:/config.yaml
-      - ./.data:/data:ro
-    networks:
-      - testing_net
-    depends_on:
-      - server
-
-  client5:
-    container_name: client5
-    image: client:latest
-    entrypoint: /client
-    environment:
-      - CLI_ID=5
-      - CLI_CSV_FILE=/data/agency-5.csv
-      - CANT_RETRIES=5
     volumes:
       - ./client/config.yaml:/config.yaml
       - ./.data:/data:ro

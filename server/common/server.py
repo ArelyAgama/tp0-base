@@ -41,6 +41,7 @@ class Server:
         self.ganadores_por_agencia = {}  # Dict: agencia_id -> [dni1, dni2, ...]
         self._server_lock = threading.Lock()  # Lock para proteger secciones críticas
         self.active_threads = 0  # Contador de threads activos
+        self._client_threads = []  # Lista de threads de clientes para JOIN
         
         logging.info(f"action: config | result: success | port: {port} | listen_backlog: {listen_backlog} | agencias_totales: {self.agencias_totales} | max_threads: {self.max_threads}")
         self._running = True
@@ -49,12 +50,32 @@ class Server:
         signal.signal(signal.SIGTERM, self._handle_sigterm)
 
     def _handle_sigterm(self, signum, frame):
-
         logging.info('action: receive_signal | result: success | signal: SIGTERM')
         self._running = False
-        # Cierro el servidor deja de recibir conexiones
+        
+        # Cerrar socket del servidor para no aceptar más conexiones
         logging.info('action: close_server_socket | result: success')
         self._server_socket.close()
+        
+        # Esperar a que todos los threads de clientes terminen (JOIN)
+        self._wait_for_client_threads()
+        
+        logging.info('action: server_finished | result: success')
+
+    def _wait_for_client_threads(self):
+        """Espera a que todos los threads de clientes terminen para liberar recursos"""
+        with self._server_lock:
+            active_threads = [t for t in self._client_threads if t.is_alive()]
+        
+        logging.info(f"action: waiting_for_threads | result: success | threads: {len(active_threads)}")
+        
+        for thread in active_threads:
+            if thread.is_alive():
+                logging.info(f"action: waiting_for_thread | result: success | thread_id: {thread.ident}")
+                thread.join()  # ← AQUÍ ESTÁ EL JOIN
+                logging.info(f"action: thread_finished | result: success | thread_id: {thread.ident}")
+        
+        logging.info("action: all_threads_finished | result: success")
 
 
     def run(self):
@@ -84,6 +105,11 @@ class Server:
                     target=self.__handle_client_connection_with_tracking,
                     args=(client_sock,)
                 )
+                
+                # Agregar thread a la lista para JOIN
+                with self._server_lock:
+                    self._client_threads.append(client_thread)
+                
                 client_thread.start()
                 
             except OSError as e:
