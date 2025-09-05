@@ -8,6 +8,7 @@ services:
       - PYTHONUNBUFFERED=1
       - AGENCIAS_TOTALES=5
       - MAX_THREADS=10
+      - CANT_RETRIES=5
     volumes:
       - ./server/config.ini:/config.ini
     networks:
