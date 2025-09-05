@@ -308,6 +308,21 @@ func (c *Client) notifyServerFinished() error {
 	return nil
 }
 
+// calculateExponentialBackoff calcula el delay para backoff exponencial
+func calculateExponentialBackoff(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
+	// Fórmula: delay = baseDelay * 2^(attempt-1)
+	// Usamos bit shifting para 2^(attempt-1) que es más eficiente que math.Pow
+	multiplier := 1 << (attempt - 1) // 2^(attempt-1)
+	retryDelay := time.Duration(int64(baseDelay) * int64(multiplier))
+
+	// Limitar al delay máximo
+	if retryDelay > maxDelay {
+		retryDelay = maxDelay
+	}
+
+	return retryDelay
+}
+
 // queryWinners consulta los ganadores de la agencia con estrategia VOLVE PRONTO
 func (c *Client) queryWinners() error {
 	// Cerrar conexión inicial (estrategia VOLVE PRONTO)
@@ -333,9 +348,13 @@ func (c *Client) queryWinners() error {
 			maxRetries = 5
 		}
 	}
-	
+
 	log.Infof("action: config_retries | result: success | client_id: %v | max_retries: %d", c.config.ID, maxRetries)
-	retryDelay := 500 * time.Millisecond
+
+	// Configuración de delays
+	baseDelay := 500 * time.Millisecond  // Delay base para backoff exponencial
+	maxDelay := 10 * time.Second         // Delay máximo para evitar esperas excesivas
+	fixedDelay := 500 * time.Millisecond // Delay fijo para otros errores
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Crear nueva conexión para cada intento
@@ -343,7 +362,9 @@ func (c *Client) queryWinners() error {
 		if err != nil {
 			log.Errorf("action: reconnect_for_winners | result: fail | client_id: %v | attempt: %d | error: %v",
 				c.config.ID, attempt, err)
-			time.Sleep(retryDelay)
+			log.Infof("action: fixed_delay | result: success | client_id: %v | attempt: %d | delay: %v",
+				c.config.ID, attempt, fixedDelay)
+			time.Sleep(fixedDelay)
 			continue
 		}
 
@@ -353,7 +374,9 @@ func (c *Client) queryWinners() error {
 			log.Errorf("action: send_query_winners | result: fail | client_id: %v | attempt: %d | error: %v",
 				c.config.ID, attempt, err)
 			conn.Close()
-			time.Sleep(retryDelay)
+			log.Infof("action: fixed_delay | result: success | client_id: %v | attempt: %d | delay: %v",
+				c.config.ID, attempt, fixedDelay)
+			time.Sleep(fixedDelay)
 			continue
 		}
 
@@ -364,7 +387,9 @@ func (c *Client) queryWinners() error {
 		if err != nil {
 			log.Errorf("action: receive_winners | result: fail | client_id: %v | attempt: %d | error: %v",
 				c.config.ID, attempt, err)
-			time.Sleep(retryDelay)
+			log.Infof("action: fixed_delay | result: success | client_id: %v | attempt: %d | delay: %v",
+				c.config.ID, attempt, fixedDelay)
+			time.Sleep(fixedDelay)
 			continue
 		}
 
@@ -372,6 +397,9 @@ func (c *Client) queryWinners() error {
 		if response == "ERROR_403" {
 			log.Infof("action: lottery_not_ready | result: success | client_id: %v | attempt: %d | status: retrying",
 				c.config.ID, attempt)
+			retryDelay := calculateExponentialBackoff(attempt, baseDelay, maxDelay)
+			log.Infof("action: exponential_backoff | result: success | client_id: %v | attempt: %d | delay: %v",
+				c.config.ID, attempt, retryDelay)
 			time.Sleep(retryDelay)
 			continue
 		}
@@ -381,7 +409,9 @@ func (c *Client) queryWinners() error {
 		if len(parts) < 3 || parts[0] != "WINNERS" {
 			log.Errorf("action: parse_winners_response | result: fail | client_id: %v | response: %s",
 				c.config.ID, response)
-			time.Sleep(retryDelay)
+			log.Infof("action: fixed_delay | result: success | client_id: %v | attempt: %d | delay: %v",
+				c.config.ID, attempt, fixedDelay)
+			time.Sleep(fixedDelay)
 			continue
 		}
 
